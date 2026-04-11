@@ -4,6 +4,13 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/sjordan/Code"]
     },
+    "esp32-devops": {
+      "command": "node",
+      "args": ["/Users/sjordan/Code/esp32-devops-mcp/dist/index.js"],
+      "env": {
+        "FIRMWARE_TOOLKIT_PATH": "/Users/sjordan/Code/FirmwareToolkit"
+      }
+    },
     "cocoindex-code": {
       "command": "uvx",
       "args": ["--prerelease=explicit", "--with", "cocoindex>=1.0.0a18", "cocoindex-code@latest"],
