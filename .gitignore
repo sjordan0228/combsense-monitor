@@ -1,0 +1,20 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Build
+build/
+
+# Superpowers
+.superpowers/
+
+# Ollama output artifacts
+ollama-output-*.md

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cocoindex-code": {
+      "command": "uvx",
+      "args": ["--prerelease=explicit", "--with", "cocoindex>=1.0.0a18", "cocoindex-code@latest"],
+      "env": {
+        "COCOINDEX_CODE_EMBEDDING_MODEL": "ollama/nomic-embed-text",
+        "OLLAMA_API_BASE": "http://192.168.1.16:11434"
+      }
+    }
+  }
+}
