@@ -1,7 +1,7 @@
 ---
 name: router
 description: Session bootstrap and navigation hub. Read at the start of every session before any task.
-last_updated: 2026-04-11 (firmware restructure)
+last_updated: 2026-04-11 (cellular module added)
 ---
 
 # Session Bootstrap
@@ -29,7 +29,7 @@ Read this file fully before doing anything else in this session.
 
 ### Not yet built
 - Phase 2: IR bee counter (8-pair beam-break array via CD74HC4067 mux)
-- Yard collector firmware (LilyGO T-SIM7080G) — includes OTA relay module
+- Yard collector firmware (LilyGO T-SIM7080G) — ESP-NOW receiver and cellular module (SIM7080G powerOn/powerOff/waitForNetwork/syncNtp) done; MQTT publisher, OTA relay module remaining
 - HiveSense iOS app sensor integration (BLE, MQTT, SensorReading model, SensorsTab)
 - 3D printed enclosures and sensor gate
 - HiveMQ Cloud account setup
@@ -44,7 +44,7 @@ Read this file fully before doing anything else in this session.
 |-----------|------|
 | Understanding the hardware design | `README.md` (the full datasheet) |
 | Working on ESP32 firmware | `firmware/hive-node/` directory |
-| Working on collector firmware | `firmware/collector/` directory (stub created, not yet built) |
+| Working on collector firmware | `firmware/collector/` directory (cellular module live; MQTT + OTA relay remaining) |
 | Shared firmware headers | `firmware/shared/` directory |
 | Making a design decision | `context/decisions.md` |
 | Writing or reviewing code | `context/conventions.md` |
