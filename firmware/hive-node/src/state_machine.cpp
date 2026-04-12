@@ -7,6 +7,7 @@
 #include "comms_espnow.h"
 #include "comms_ble.h"
 #include "storage.h"
+#include "ota_update.h"
 
 #include <Arduino.h>
 #include <esp_sleep.h>
@@ -35,14 +36,20 @@ void populateHiveId(HivePayload& payload) {
 namespace StateMachine {
 
 NodeState determineInitialState() {
+    // On first boot after OTA, validate the new firmware
+    OtaUpdate::validateNewFirmware();
+
     esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
 
     if (wakeupReason == ESP_SLEEP_WAKEUP_TIMER) {
+        if (OtaUpdate::isTransferInProgress()) {
+            Serial.println("[SM] Timer wakeup — OTA in progress");
+            return NodeState::OTA_RECEIVE;
+        }
         Serial.println("[SM] Timer wakeup — starting sensor read");
         return NodeState::SENSOR_READ;
     }
 
-    // First boot or other wake reason — full initialization
     Serial.println("[SM] Fresh boot — initializing");
     return NodeState::SENSOR_READ;
 }
@@ -139,6 +146,13 @@ NodeState executeState(NodeState current, HivePayload& payload) {
             return PowerManager::isDaytime(getCurrentHour())
                 ? NodeState::DAYTIME_IDLE
                 : NodeState::NIGHTTIME_SLEEP;
+        }
+
+        case NodeState::OTA_RECEIVE: {
+            Serial.println("[SM] === OTA_RECEIVE ===");
+            OtaUpdate::resumeTransfer();
+            // Still do sensor reads while OTA is active
+            return NodeState::SENSOR_READ;
         }
 
         case NodeState::DAYTIME_IDLE: {
