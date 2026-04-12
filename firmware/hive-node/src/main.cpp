@@ -5,8 +5,16 @@
 #include "power_manager.h"
 #include "storage.h"
 #include "serial_console.h"
+#include <Preferences.h>
 
 RTC_DATA_ATTR static uint32_t bootCount = 0;
+
+/// Ensure NVS namespace exists — creates it on first boot.
+void initializeNvs() {
+    Preferences prefs;
+    prefs.begin("hivesense", false);  // read-write creates namespace if missing
+    prefs.end();
+}
 
 void setup() {
     Serial.begin(115200);
@@ -14,6 +22,7 @@ void setup() {
 
     Serial.printf("\n[MAIN] HiveSense Node — Phase 1 | Boot #%u\n", bootCount);
 
+    initializeNvs();
     SerialConsole::checkForConsole();
 
     PowerManager::initialize();
