@@ -2,6 +2,7 @@
 name: router
 description: Session bootstrap and navigation hub. Read at the start of every session before any task.
 last_updated: 2026-04-11
+firmware_task: 8_complete
 ---
 
 # Session Bootstrap
@@ -19,8 +20,10 @@ The hardware datasheet (README.md) covers the full system design:
 - BLE direct + MQTT cloud dual communication
 - iOS app integration spec (Section 8 of README.md)
 
+**In progress:**
+- ESP32 firmware (Arduino/PlatformIO) — Task 8 complete: ESP-NOW communication module (comms_espnow.cpp). WiFi STA init, NVS collector MAC load, up to 3 retries with 1 s ACK timeout and 2 s inter-retry delay, RSSI population on success. Builds clean.
+
 **Not yet built:**
-- ESP32 firmware (Arduino/PlatformIO)
 - Yard collector firmware
 - HiveSense iOS app sensor integration (BLE, MQTT, SensorReading model, SensorsTab)
 - 3D printed enclosures and sensor gate
@@ -35,7 +38,7 @@ The hardware datasheet (README.md) covers the full system design:
 | Task type | Load |
 |-----------|------|
 | Understanding the hardware design | `README.md` (the full datasheet) |
-| Working on ESP32 firmware | `firmware/` directory (not yet created) |
+| Working on ESP32 firmware | `firmware/` directory |
 | Working on collector firmware | `collector/` directory (not yet created) |
 | Making a design decision | `context/decisions.md` |
 | Writing or reviewing code | `context/conventions.md` |
