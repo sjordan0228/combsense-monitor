@@ -1,12 +1,16 @@
 #include "comms_espnow.h"
 #include "config.h"
 #include "types.h"
+#include "espnow_protocol.h"
+#include "ota_update.h"
+#include "state_machine.h"
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <Preferences.h>
+#include <cstring>
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -48,6 +52,38 @@ void onDataSent(const uint8_t* macAddr, esp_now_send_status_t status) {
     sendComplete = true;
 }
 
+/// ESP-NOW receive callback — handles TIME_SYNC and OTA packets from collector.
+void onDataReceived(const uint8_t* mac, const uint8_t* data, int len) {
+    if (len < static_cast<int>(sizeof(EspNowHeader))) {
+        return;
+    }
+
+    const auto* header = reinterpret_cast<const EspNowHeader*>(data);
+    const uint8_t* payload = data + sizeof(EspNowHeader);
+
+    switch (header->type) {
+        case EspNowPacketType::TIME_SYNC: {
+            if (header->data_len >= sizeof(TimeSyncPayload)) {
+                const auto* ts = reinterpret_cast<const TimeSyncPayload*>(payload);
+                StateMachine::setTime(ts->epoch_seconds);
+                Serial.printf("[ESPNOW] Time synced: %u\n", ts->epoch_seconds);
+            }
+            break;
+        }
+
+        case EspNowPacketType::OTA_PACKET: {
+            if (header->data_len >= sizeof(OtaPacket)) {
+                const auto* otaPkt = reinterpret_cast<const OtaPacket*>(payload);
+                OtaUpdate::handleOtaPacket(*otaPkt);
+            }
+            break;
+        }
+
+        default:
+            break;
+    }
+}
+
 }  // anonymous namespace
 
 // ---------------------------------------------------------------------------
@@ -66,6 +102,7 @@ bool initialize() {
     }
 
     esp_now_register_send_cb(onDataSent);
+    esp_now_register_recv_cb(onDataReceived);
 
     loadCollectorMac();
 
@@ -87,15 +124,20 @@ bool initialize() {
 }
 
 bool sendPayload(HivePayload& payload) {
+    // Wrap payload in ESP-NOW protocol header
+    uint8_t packet[sizeof(EspNowHeader) + sizeof(HivePayload)];
+    auto* header = reinterpret_cast<EspNowHeader*>(packet);
+    header->type = EspNowPacketType::SENSOR_DATA;
+    header->data_len = sizeof(HivePayload);
+    memcpy(packet + sizeof(EspNowHeader), &payload, sizeof(HivePayload));
+
     bool ackReceived = false;
 
     for (uint8_t attempt = 1; attempt <= ESPNOW_MAX_RETRIES; ++attempt) {
         sendComplete = false;
         sendSuccess  = false;
 
-        esp_err_t err = esp_now_send(collectorMac,
-                                     reinterpret_cast<const uint8_t*>(&payload),
-                                     sizeof(HivePayload));
+        esp_err_t err = esp_now_send(collectorMac, packet, sizeof(packet));
         if (err != ESP_OK) {
             Serial.printf("[ESPNOW] esp_now_send error on attempt %u: %d\n", attempt, err);
         } else {
