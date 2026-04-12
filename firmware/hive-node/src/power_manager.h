@@ -26,6 +26,9 @@ namespace PowerManager {
     /// Disable WiFi and Bluetooth radios before sleep.
     void disableRadios();
 
+    /// Disable the onboard WS2812 RGB LED to save power.
+    void disableOnboardLed();
+
     /// Check if current hour falls within daytime window.
     /// Uses NVS-stored day_start and day_end hours.
     bool isDaytime(uint8_t currentHour);

@@ -35,11 +35,11 @@ namespace Battery {
 
 bool initialize() {
     adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_11);
+    adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_12);
 
     esp_adc_cal_characterize(
         ADC_UNIT_1,
-        ADC_ATTEN_DB_11,
+        ADC_ATTEN_DB_12,
         ADC_WIDTH_BIT_12,
         1100,  // default Vref in mV
         &adcCharacteristics
@@ -53,7 +53,7 @@ bool readMeasurements(HivePayload& payload) {
     uint32_t adcSum = 0;
 
     for (uint16_t i = 0; i < ADC_SAMPLE_COUNT; i++) {
-        adcSum += adc1_get_raw(ADC1_CHANNEL_6);
+        adcSum += adc1_get_raw(ADC1_CHANNEL_0);
     }
 
     uint32_t adcAverage = adcSum / ADC_SAMPLE_COUNT;

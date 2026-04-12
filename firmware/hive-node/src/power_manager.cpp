@@ -10,6 +10,11 @@
 
 namespace PowerManager {
 
+void disableOnboardLed() {
+    pinMode(PIN_ONBOARD_RGB, OUTPUT);
+    digitalWrite(PIN_ONBOARD_RGB, LOW);
+}
+
 void initialize() {
     pinMode(PIN_MOSFET_HX711, OUTPUT);
     digitalWrite(PIN_MOSFET_HX711, LOW);
@@ -18,7 +23,9 @@ void initialize() {
     pinMode(PIN_MOSFET_IR, OUTPUT);
     digitalWrite(PIN_MOSFET_IR, LOW);
 
-    Serial.println("[POWER] MOSFET gates initialized — all OFF");
+    disableOnboardLed();
+
+    Serial.println("[POWER] MOSFET gates initialized — all OFF, RGB LED disabled");
 }
 
 void enterDeepSleep(uint8_t minutes) {
@@ -40,7 +47,7 @@ void enableLightSleep() {
     );
 
     // Automatic light sleep: CPU sleeps when idle, wakes on interrupts/timers
-    esp_pm_config_esp32_t pmConfig = {
+    esp_pm_config_esp32s3_t pmConfig = {
         .max_freq_mhz = 80,
         .min_freq_mhz = 10,
         .light_sleep_enable = true
