@@ -6,9 +6,9 @@ last_updated: 2026-04-11
 
 # Decisions
 
-## ESP32-WROOM-32 over ESP32-S3
-**Decision:** Use ESP32-WROOM-32 for hive nodes.
-**Why:** Cheaper ($3 vs $7), massive community/tutorial base, 25+ usable GPIO is enough, BLE 4.2 sufficient for data transfer. S3's extra pins and BLE 5.0 not needed.
+## ~~ESP32-WROOM-32 over ESP32-S3~~ → Switched to ESP32-S3
+**Decision:** Use Freenove ESP32-S3 Lite (8MB flash) for hive nodes.
+**Why:** 8MB flash enables dual OTA partitions. BLE 5.0 improves sync throughput. Native USB. WROOM-32E with 8MB was hard to source; the S3 Lite is readily available at ~$7.
 
 ## SHT31 over DHT22
 **Decision:** Use Sensirion SHT31 for temperature and humidity.
@@ -45,6 +45,22 @@ last_updated: 2026-04-11
 ## Resumable Chunked OTA
 **Decision:** OTA transfers use sequential 244-byte chunks over ESP-NOW with NVS progress tracking.
 **Why:** ESP-NOW max payload is 250 bytes. Sequential ACK is simple and reliable. NVS progress survives sleep cycles. esp_ota_begin erases the partition so resume restarts from chunk 0, but full transfer completes in 1-2 wake cycles (~30-60 min) which is acceptable.
+
+## TinyGSM for modem abstraction
+**Decision:** Use TinyGSM library for SIM7080G modem control on the collector.
+**Why:** Abstracts AT commands behind familiar Client interface. Supports SIM7080G's native MQTT stack — TLS terminates on the modem, not the ESP32. Well-tested with PlatformIO.
+
+## Batch MQTT publishing
+**Decision:** Collector buffers ESP-NOW payloads in RAM and publishes once per 30-min cycle.
+**Why:** Modem is the biggest power draw. One modem-on per cycle (~30 sec) instead of per-node saves significant battery. iOS app already expects 30-min latency.
+
+## Always-listening ESP-NOW (no scheduled windows)
+**Decision:** Collector stays in light sleep with ESP-NOW radio active at all times.
+**Why:** ESP32 internal RTC drifts 5-10 min/day. Scheduled listen windows would desync with hive nodes within days. NTP fixes collector drift but nodes have no internet. Time sync broadcast helps but adds fragility. Always-listening at ~5-8 mA is sustainable with the 5-10W solar panel.
+
+## Time sync every publish cycle
+**Decision:** Collector broadcasts TIME_SYNC via ESP-NOW after every MQTT publish, not once daily.
+**Why:** Negligible cost (~100 µs per broadcast). Keeps hive node clocks accurate to within 30 minutes. Simpler logic — no "did I sync today" tracking.
 
 ## Multiplexer for IR array
 **Decision:** Use 2× CD74HC4067 multiplexers for 8 IR pairs instead of direct GPIO.
