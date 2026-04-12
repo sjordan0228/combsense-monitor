@@ -1,7 +1,7 @@
 ---
 name: router
 description: Session bootstrap and navigation hub. Read at the start of every session before any task.
-last_updated: 2026-04-11
+last_updated: 2026-04-11 (firmware restructure)
 ---
 
 # Session Bootstrap
@@ -14,7 +14,7 @@ Read this file fully before doing anything else in this session.
 
 ### Completed
 - Hardware datasheet and design spec (README.md)
-- Phase 1 hive node firmware (`firmware/`) — all modules built, compiles clean
+- Phase 1 hive node firmware (`firmware/hive-node/`) — all modules built, compiles clean
   - State machine dispatcher with power-aware sleep/wake cycle
   - SHT31 dual temp/humidity (internal 0x44 + external 0x45)
   - HX711 weight with NVS calibration and MOSFET gating
@@ -41,8 +41,9 @@ Read this file fully before doing anything else in this session.
 | Task type | Load |
 |-----------|------|
 | Understanding the hardware design | `README.md` (the full datasheet) |
-| Working on ESP32 firmware | `firmware/` directory |
-| Working on collector firmware | `collector/` directory (not yet created) |
+| Working on ESP32 firmware | `firmware/hive-node/` directory |
+| Working on collector firmware | `firmware/collector/` directory (stub created, not yet built) |
+| Shared firmware headers | `firmware/shared/` directory |
 | Making a design decision | `context/decisions.md` |
 | Writing or reviewing code | `context/conventions.md` |
 
