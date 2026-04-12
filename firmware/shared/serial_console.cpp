@@ -133,8 +133,16 @@ bool handleCommand(Preferences& prefs, const char* line) {
             return true;
         }
 
-        // Type detection
-        if (strchr(value, '.') != nullptr) {
+        // Type detection — a float has exactly one dot and only digits otherwise
+        int dotCount = 0;
+        bool isFloat = false;
+        for (const char* p = value; *p; p++) {
+            if (*p == '.') dotCount++;
+            else if (*p < '0' || *p > '9') { dotCount = 99; break; }
+        }
+        isFloat = (dotCount == 1);
+
+        if (isFloat) {
             float f = atof(value);
             prefs.putFloat(key, f);
             Serial.printf("  %s = %.4f (float)\n", key, f);
