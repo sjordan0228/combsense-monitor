@@ -17,14 +17,33 @@ hivesense-monitor/
   README.md           — Hardware datasheet (primary design doc)
 ```
 
+## Engineering Principles
+
+- **SOLID, DRY, KISS** — prioritize long-term maintainability over clever one-liners
+- **Descriptive semantic naming** — `calculateTotalBalance` not `calc`, `readInternalTemperature` not `readTemp1`
+- **Small focused functions** — single responsibility per function
+- **Guard clauses over nesting** — avoid deeply nested loops or complex ternaries
+- **Const-correctness** — mark parameters `const&` when not modified
+- **RAII** — tie resource lifetime to scope (file handles, peripheral power, buffers)
+- **Modern C++ idioms** — prefer STL algorithms over manual loops where intention is clearer
+- **Meaningful inline comments** — explain "why" only where not obvious from the code
+- **Docstrings for public methods** — document interface, parameters, and return values
+- **Explicit ownership** — clear who creates, owns, and destroys resources
+
 ## Firmware Conventions (ESP32/Arduino)
 
 - Use PlatformIO for build management
 - C/C++ with Arduino framework
 - Modular files: one file per sensor/subsystem
+- Each module exposes `init()`, `read()`, `sleep()` interface
+- Central state machine dispatcher calls into modules
 - Use deep sleep and power gating aggressively
+- MOSFET power control lives in each module's `sleep()`/`init()`
 - Store config in NVS (non-volatile storage)
 - ESP-NOW payload struct defined in shared header
+- Prefer `std::accumulate`, `std::transform` etc. over raw loops when clearer
+- Use `explicit` on single-argument constructors
+- Use `const std::string&` over `String` where possible (avoid Arduino String fragmentation)
 
 ## Branching Strategy
 
