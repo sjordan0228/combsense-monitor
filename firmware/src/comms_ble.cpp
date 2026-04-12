@@ -4,10 +4,7 @@
 #include "storage.h"
 
 #include <Arduino.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <NimBLEDevice.h>
 #include <Preferences.h>
 
 // ---------------------------------------------------------------------------
@@ -16,11 +13,11 @@
 
 namespace {
 
-BLEServer*         bleServer        = nullptr;
-BLECharacteristic* charSensorLog    = nullptr;
-BLECharacteristic* charReadingCount = nullptr;
-BLECharacteristic* charHiveId       = nullptr;
-BLECharacteristic* charClearLog     = nullptr;
+NimBLEServer*         bleServer        = nullptr;
+NimBLECharacteristic* charSensorLog    = nullptr;
+NimBLECharacteristic* charReadingCount = nullptr;
+NimBLECharacteristic* charHiveId       = nullptr;
+NimBLECharacteristic* charClearLog     = nullptr;
 
 // Written from BLE callback context, read from main task
 volatile bool deviceConnected = false;
@@ -30,14 +27,14 @@ volatile bool syncComplete    = false;
 // BLE Callbacks
 // ---------------------------------------------------------------------------
 
-class ServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer* server) override {
+class ServerCallbacks : public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer* server) override {
         deviceConnected = true;
         syncComplete    = false;
         Serial.println("[BLE] Phone connected");
     }
 
-    void onDisconnect(BLEServer* server) override {
+    void onDisconnect(NimBLEServer* server) override {
         deviceConnected = false;
         syncComplete    = true;
         Serial.println("[BLE] Phone disconnected");
@@ -45,8 +42,8 @@ class ServerCallbacks : public BLEServerCallbacks {
 };
 
 /// Write 0x01 to this characteristic to clear stored readings after sync.
-class ClearLogCallback : public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic* characteristic) override {
+class ClearLogCallback : public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic* characteristic) override {
         std::string value = characteristic->getValue();
         if (value.length() != 1 || value[0] != 0x01) {
             return;
@@ -63,8 +60,8 @@ class ClearLogCallback : public BLECharacteristicCallbacks {
 };
 
 /// Phone writes hive ID during initial pairing to associate this node.
-class HiveIdCallback : public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic* characteristic) override {
+class HiveIdCallback : public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic* characteristic) override {
         std::string value = characteristic->getValue();
         if (value.empty() || value.length() >= 16) {
             return;
@@ -124,25 +121,25 @@ bool initialize() {
 
     String deviceName = "HiveSense-" + hiveId;
 
-    BLEDevice::init(deviceName.c_str());
-    BLEDevice::setMTU(512);
+    NimBLEDevice::init(deviceName.c_str());
+    NimBLEDevice::setMTU(512);
 
-    bleServer = BLEDevice::createServer();
+    bleServer = NimBLEDevice::createServer();
     bleServer->setCallbacks(new ServerCallbacks());
 
-    BLEService* service = bleServer->createService(BLE_SERVICE_UUID);
+    NimBLEService* service = bleServer->createService(BLE_SERVICE_UUID);
 
     // Sensor Log — bulk transfer of stored readings via notify
     charSensorLog = service->createCharacteristic(
         BLE_CHAR_SENSOR_LOG,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
     );
-    charSensorLog->addDescriptor(new BLE2902());
+    // NimBLE handles CCCD (BLE2902) descriptors automatically for notify characteristics
 
     // Reading Count — phone reads this to know how many readings to expect
     charReadingCount = service->createCharacteristic(
         BLE_CHAR_READING_COUNT,
-        BLECharacteristic::PROPERTY_READ
+        NIMBLE_PROPERTY::READ
     );
     uint16_t count = Storage::getReadingCount();
     charReadingCount->setValue(reinterpret_cast<uint8_t*>(&count), sizeof(uint16_t));
@@ -150,7 +147,7 @@ bool initialize() {
     // Hive ID — readable for identification, writable for pairing
     charHiveId = service->createCharacteristic(
         BLE_CHAR_HIVE_ID,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
+        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE
     );
     charHiveId->setCallbacks(new HiveIdCallback());
     charHiveId->setValue(hiveId.c_str());
@@ -158,7 +155,7 @@ bool initialize() {
     // Clear Log — phone writes 0x01 after confirming complete download
     charClearLog = service->createCharacteristic(
         BLE_CHAR_CLEAR_LOG,
-        BLECharacteristic::PROPERTY_WRITE
+        NIMBLE_PROPERTY::WRITE
     );
     charClearLog->setCallbacks(new ClearLogCallback());
 
@@ -173,7 +170,7 @@ bool advertiseAndWait(uint16_t timeoutMs) {
     deviceConnected = false;
     syncComplete    = false;
 
-    BLEAdvertising* advertising = BLEDevice::getAdvertising();
+    NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
     advertising->addServiceUUID(BLE_SERVICE_UUID);
     advertising->setScanResponse(true);
     advertising->setMinPreferred(0x06);
@@ -206,7 +203,7 @@ void waitForSyncComplete() {
 }
 
 void shutdown() {
-    BLEDevice::deinit(true);  // true = release memory
+    NimBLEDevice::deinit(true);  // true = release memory
     bleServer        = nullptr;
     charSensorLog    = nullptr;
     charReadingCount = nullptr;
