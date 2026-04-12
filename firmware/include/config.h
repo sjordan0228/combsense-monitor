@@ -61,24 +61,24 @@ constexpr uint16_t MAX_STORED_READINGS = 500;
 // BLE UUIDs — derived from "HiveSense" ASCII
 // =============================================================================
 
-#define BLE_SERVICE_UUID        "4E6F7200-7468-6976-6553-656E73650000"
-#define BLE_CHAR_SENSOR_LOG     "4E6F7200-7468-6976-6553-656E73650001"
-#define BLE_CHAR_READING_COUNT  "4E6F7200-7468-6976-6553-656E73650002"
-#define BLE_CHAR_HIVE_ID        "4E6F7200-7468-6976-6553-656E73650003"
-#define BLE_CHAR_CLEAR_LOG      "4E6F7200-7468-6976-6553-656E73650004"
+constexpr const char* BLE_SERVICE_UUID       = "4E6F7200-7468-6976-6553-656E73650000";
+constexpr const char* BLE_CHAR_SENSOR_LOG    = "4E6F7200-7468-6976-6553-656E73650001";
+constexpr const char* BLE_CHAR_READING_COUNT = "4E6F7200-7468-6976-6553-656E73650002";
+constexpr const char* BLE_CHAR_HIVE_ID       = "4E6F7200-7468-6976-6553-656E73650003";
+constexpr const char* BLE_CHAR_CLEAR_LOG     = "4E6F7200-7468-6976-6553-656E73650004";
 
 // =============================================================================
 // NVS Keys
 // =============================================================================
 
-#define NVS_NAMESPACE       "hivesense"
-#define NVS_KEY_HIVE_ID     "hive_id"
-#define NVS_KEY_COLLECTOR   "collector_mac"
-#define NVS_KEY_DAY_START   "day_start"
-#define NVS_KEY_DAY_END     "day_end"
-#define NVS_KEY_INTERVAL    "read_interval"
-#define NVS_KEY_WEIGHT_OFF  "weight_off"
-#define NVS_KEY_WEIGHT_SCL  "weight_scl"
+constexpr const char* NVS_NAMESPACE      = "hivesense";
+constexpr const char* NVS_KEY_HIVE_ID    = "hive_id";
+constexpr const char* NVS_KEY_COLLECTOR  = "collector_mac";
+constexpr const char* NVS_KEY_DAY_START  = "day_start";
+constexpr const char* NVS_KEY_DAY_END    = "day_end";
+constexpr const char* NVS_KEY_INTERVAL   = "read_interval";
+constexpr const char* NVS_KEY_WEIGHT_OFF = "weight_off";
+constexpr const char* NVS_KEY_WEIGHT_SCL = "weight_scl";
 
 // =============================================================================
 // Payload Version

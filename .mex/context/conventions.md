@@ -35,10 +35,10 @@ hivesense-monitor/
 - Use PlatformIO for build management
 - C/C++ with Arduino framework
 - Modular files: one file per sensor/subsystem
-- Each module exposes `init()`, `read()`, `sleep()` interface
+- Each module exposes `initialize()`, `readMeasurements()`, `enterSleep()` interface
 - Central state machine dispatcher calls into modules
 - Use deep sleep and power gating aggressively
-- MOSFET power control lives in each module's `sleep()`/`init()`
+- MOSFET power control lives in each module's `enterSleep()`/`initialize()`
 - Store config in NVS (non-volatile storage)
 - ESP-NOW payload struct defined in shared header
 - Prefer `std::accumulate`, `std::transform` etc. over raw loops when clearer

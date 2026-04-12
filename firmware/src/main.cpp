@@ -15,7 +15,10 @@ void setup() {
     Serial.printf("[BOOT] count=%u, wakeup_reason=%d\n", bootCount, wakeupReason);
     Serial.println("[BOOT] HiveSense Node — Phase 1 firmware");
 
-    currentState = NodeState::BOOT;
+    // Only reset state on cold boot — preserve RTC state across light sleep wakes
+    if (wakeupReason == ESP_SLEEP_WAKEUP_UNDEFINED) {
+        currentState = NodeState::BOOT;
+    }
 }
 
 void loop() {
