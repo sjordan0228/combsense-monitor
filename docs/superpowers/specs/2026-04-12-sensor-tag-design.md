@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-12
 **Scope:** DIY wireless BLE sensor tag for internal hive temp/humidity, plus hive node BLE scanner to receive tag data. Eliminates wires into the hive body.
-**Prototype hardware:** Seeed XIAO ESP32C3 + SHT31 + CR2032
+**Prototype hardware:** Seeed XIAO ESP32C6 + SHT31 + CR2032
 **Production target:** Custom PCB, 25×30mm, 2+ year coin cell life
 
 ---
@@ -15,7 +15,7 @@ A small battery-powered tag sits inside the hive between frames. It wakes every 
 Inside Hive                          Outside Hive (enclosure)
 ┌─────────────┐     BLE advert      ┌──────────────────────┐
 │ Sensor Tag  │ ─────────────────→  │ Hive Node (ESP32-S3) │
-│ (ESP32-C3)  │                     │                      │
+│ (ESP32-C6)  │                     │                      │
 │ SHT31       │                     │ SHT31 (external)     │
 │ CR2032      │                     │ HX711 + load cells   │
 └─────────────┘                     │ ESP-NOW, BLE GATT    │
@@ -44,7 +44,7 @@ firmware/sensor-tag/
 ```ini
 [env:xiao-c3]
 platform = espressif32@^6.5.0
-board = seeed_xiao_esp32c3
+board = seeed_xiao_esp32c6
 framework = arduino
 monitor_speed = 115200
 
@@ -94,8 +94,8 @@ Decoding on hive node:
 
 | Pin | Function |
 |---|---|
-| D4 (GPIO 6) | SDA |
-| D5 (GPIO 7) | SCL |
+| D4 (GPIO 4) | SDA |
+| D5 (GPIO 5) | SCL |
 
 ### Tag Configuration via Serial Console
 
@@ -110,21 +110,21 @@ Reuse the shared `serial_console` module. On boot, 3-second window to enter cons
 
 ## 3. Power Budget
 
-### Prototype (XIAO ESP32C3 dev board)
+### Prototype (XIAO ESP32C6 dev board)
 
 | State | Duration | Current | Notes |
 |---|---|---|---|
-| Deep sleep | ~59.8 s | ~40-50 µA | USB chip + regulator overhead |
+| Deep sleep | ~59.8 s | ~11 µA | Better regulator than C3 |
 | Active (read + advertise) | ~200 ms | ~15 mA | |
 
-Daily: ~1.3 mAh sleep + ~0.07 mAh active = ~1.4 mAh/day
-CR2032 (220 mAh): **~5 months** — fine for prototyping.
+Daily: ~0.26 mAh sleep + ~0.07 mAh active = ~0.33 mAh/day
+CR2032 (220 mAh): **~22 months** — excellent even for prototyping.
 
-### Production (custom PCB, bare ESP32-C3-MINI-1)
+### Production (custom PCB, bare ESP32-C6-MINI-1)
 
 | State | Duration | Current | Notes |
 |---|---|---|---|
-| Deep sleep | ~59.8 s | ~7 µA | 5 µA C3 + 2 µA SHT31 idle |
+| Deep sleep | ~59.8 s | ~7 µA | 5 µA C6 + 2 µA SHT31 idle |
 | Active (read + advertise) | ~200 ms | ~15 mA | |
 
 Daily: ~0.17 mAh sleep + ~0.07 mAh active = ~0.24 mAh/day
@@ -208,7 +208,7 @@ Power impact: ~12 mA × 5 sec = 0.017 mAh per wake cycle. At 48 cycles/day = 0.8
 firmware/
 ├── hive-node/       — ESP32-S3 hive node (existing)
 ├── collector/       — LilyGO T-SIM7080G (existing)
-├── sensor-tag/      — ESP32-C3 wireless sensor tag (NEW)
+├── sensor-tag/      — ESP32-C6 wireless sensor tag (NEW)
 │   ├── platformio.ini
 │   ├── include/
 │   │   └── config.h
@@ -247,7 +247,7 @@ The sensor tag reuses `serial_console` from shared for provisioning.
 
 | Item | Qty | Est. Price |
 |---|---|---|
-| Seeed XIAO ESP32C3 | 2 | ~$10 |
+| Seeed XIAO ESP32C6 | 2 | ~$10 |
 | HiLetgo SHT31-D breakout | (on order) | $17 |
 | CR2032 coin cell | 4-pack | ~$4 |
 | CR2032 holder (through-hole) | 2 | ~$3 |
