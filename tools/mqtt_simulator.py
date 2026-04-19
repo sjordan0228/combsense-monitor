@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Simulates a HiveSense yard collector publishing sensor data to MQTT.
+Simulates a CombSense yard collector publishing sensor data to MQTT.
 Generates realistic hive telemetry for testing the iOS app and dashboards
 without physical hardware.
 
 Usage:
     python3 mqtt_simulator.py
     python3 mqtt_simulator.py --hives 5 --interval 10
-    python3 mqtt_simulator.py --host 192.168.1.82 --user hivesense --password hivesense
+    python3 mqtt_simulator.py --host 192.168.1.82 --user combsense --password combsense
 """
 
 import argparse
@@ -83,27 +83,27 @@ class HiveSimulator:
         rssi = max(-80, min(-30, rssi))
 
         return {
-            f"hivesense/hive/{self.id}/weight": f"{self.weight:.2f}",
-            f"hivesense/hive/{self.id}/temp/internal": f"{self.temp_internal:.1f}",
-            f"hivesense/hive/{self.id}/temp/external": f"{external_temp:.1f}",
-            f"hivesense/hive/{self.id}/humidity/internal": f"{self.humidity_internal:.1f}",
-            f"hivesense/hive/{self.id}/humidity/external": f"{self.humidity_external:.1f}",
-            f"hivesense/hive/{self.id}/bees/in": str(bees_in),
-            f"hivesense/hive/{self.id}/bees/out": str(bees_out),
-            f"hivesense/hive/{self.id}/bees/activity": str(activity),
-            f"hivesense/hive/{self.id}/battery": str(int(self.battery)),
-            f"hivesense/hive/{self.id}/rssi": str(rssi),
+            f"combsense/hive/{self.id}/weight": f"{self.weight:.2f}",
+            f"combsense/hive/{self.id}/temp/internal": f"{self.temp_internal:.1f}",
+            f"combsense/hive/{self.id}/temp/external": f"{external_temp:.1f}",
+            f"combsense/hive/{self.id}/humidity/internal": f"{self.humidity_internal:.1f}",
+            f"combsense/hive/{self.id}/humidity/external": f"{self.humidity_external:.1f}",
+            f"combsense/hive/{self.id}/bees/in": str(bees_in),
+            f"combsense/hive/{self.id}/bees/out": str(bees_out),
+            f"combsense/hive/{self.id}/bees/activity": str(activity),
+            f"combsense/hive/{self.id}/battery": str(int(self.battery)),
+            f"combsense/hive/{self.id}/rssi": str(rssi),
         }
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Simulate HiveSense collector MQTT publishes"
+        description="Simulate CombSense collector MQTT publishes"
     )
     parser.add_argument("--host", default="192.168.1.82")
     parser.add_argument("--port", type=int, default=1883)
-    parser.add_argument("--user", default="hivesense")
-    parser.add_argument("--password", default="hivesense")
+    parser.add_argument("--user", default="combsense")
+    parser.add_argument("--password", default="combsense")
     parser.add_argument("--interval", type=int, default=30, help="Seconds between publishes")
     parser.add_argument("--hives", type=int, default=3, help="Number of simulated hives")
     return parser.parse_args()
@@ -135,9 +135,9 @@ def main():
             # Print summary line per hive instead of per-topic
             print(
                 f"[{timestamp}] {hive.id}: "
-                f"weight={readings[f'hivesense/hive/{hive.id}/weight']}kg "
-                f"temp={readings[f'hivesense/hive/{hive.id}/temp/internal']}C "
-                f"batt={readings[f'hivesense/hive/{hive.id}/battery']}%"
+                f"weight={readings[f'combsense/hive/{hive.id}/weight']}kg "
+                f"temp={readings[f'combsense/hive/{hive.id}/temp/internal']}C "
+                f"batt={readings[f'combsense/hive/{hive.id}/battery']}%"
             )
 
         print()

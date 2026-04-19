@@ -1,4 +1,4 @@
-# HiveSense
+# CombSense
 ### Smart Hive Monitoring System
 **Technical Design & Hardware Datasheet — Rev 1.1 — 2026**
 
@@ -18,7 +18,7 @@
 
 ## 1. System Overview
 
-HiveSense is an IoT-based beehive telemetry system that uses a suite of sensors to continuously monitor hive health. Each hive node communicates wirelessly to a central yard collector which forwards data via cellular to an MQTT cloud broker. The HiveSense iOS app subscribes to the broker to display real-time and historical data from anywhere. BLE provides direct access when at the yard without requiring internet.
+CombSense is an IoT-based beehive telemetry system that uses a suite of sensors to continuously monitor hive health. Each hive node communicates wirelessly to a central yard collector which forwards data via cellular to an MQTT cloud broker. The CombSense iOS app subscribes to the broker to display real-time and historical data from anywhere. BLE provides direct access when at the yard without requiring internet.
 
 The system is designed for remote apiary deployment with full solar-powered autonomous operation, requiring no mains power or on-site WiFi infrastructure.
 
@@ -27,14 +27,14 @@ The system is designed for remote apiary deployment with full solar-powered auto
 | **Hive Node** | One per hive. ESP32-WROOM-32 with all sensors. Communicates via ESP-NOW + BLE. |
 | **Yard Collector** | One per apiary. LilyGO T-SIM7080G. Receives ESP-NOW from all nodes, forwards via cellular MQTT. |
 | **Cloud Broker** | HiveMQ Cloud (free tier). MQTT broker — receives from collector, serves to app. |
-| **iPhone App** | HiveSense iOS app. Subscribes to MQTT for remote data. BLE for direct yard access. |
+| **iPhone App** | CombSense iOS app. Subscribes to MQTT for remote data. BLE for direct yard access. |
 
 ```
                               REMOTE (from anywhere)
 Hive Node 1 ———┐
 Hive Node 2 ———┤——→  Yard Collector  ——→  Cellular  ——→  HiveMQ Cloud (MQTT)
 Hive Node 3 ———┤     (LilyGO T-SIM)                          ↓
-Hive Node N ———┘                                        HiveSense iOS App
+Hive Node N ———┘                                        CombSense iOS App
                                                               ↑
                               AT THE YARD (direct)            │
 Hive Node 1 ——————————————→  BLE  ——————————————————→  iPhone ——┘
@@ -248,7 +248,7 @@ The system supports two communication paths operating simultaneously:
 
 ### 4.2 Path 1: BLE Direct (At the Yard)
 
-Each hive node runs a BLE peripheral server that advertises when it has stored data. When the HiveSense iOS app comes within range, it discovers the node, connects, and downloads stored sensor logs.
+Each hive node runs a BLE peripheral server that advertises when it has stored data. When the CombSense iOS app comes within range, it discovers the node, connects, and downloads stored sensor logs.
 
 | Parameter | Value |
 |---|---|
@@ -260,8 +260,8 @@ Each hive node runs a BLE peripheral server that advertises when it has stored d
 | Power impact | Minimal — BLE advertisement only when data available |
 
 **BLE flow:**
-1. ESP32 advertises "HiveSense-Hive3" with beacon containing reading count
-2. HiveSense app discovers beacons while in Yard Mode or Scan tab
+1. ESP32 advertises "CombSense-Hive3" with beacon containing reading count
+2. CombSense app discovers beacons while in Yard Mode or Scan tab
 3. App shows "3 hives with sensor data available"
 4. User taps "Sync All" — app connects to each ESP32, downloads readings
 5. Data saved to SwiftData — shows graphs in hive detail screen
@@ -294,7 +294,7 @@ The LilyGO T-SIM7080G serves as the yard aggregator and cellular gateway. It rec
 
 #### 4.3.2 MQTT Cloud Broker — HiveMQ Cloud
 
-HiveMQ Cloud provides a managed MQTT broker with a free tier sufficient for HiveSense.
+HiveMQ Cloud provides a managed MQTT broker with a free tier sufficient for CombSense.
 
 | Parameter | Value |
 |---|---|
@@ -305,32 +305,32 @@ HiveMQ Cloud provides a managed MQTT broker with a free tier sufficient for Hive
 | Cost | Free for v1 scale |
 | Alternative options | CloudMQTT, AWS IoT Core, Mosquitto on VPS ($5/mo) |
 
-The collector publishes sensor data to HiveMQ. The HiveSense iOS app subscribes to receive updates in near-real-time.
+The collector publishes sensor data to HiveMQ. The CombSense iOS app subscribes to receive updates in near-real-time.
 
 #### 4.3.3 MQTT Topic Schema
 
 | Topic | Payload | Type |
 |---|---|---|
-| `hivesense/hive/{id}/weight` | kg | Float |
-| `hivesense/hive/{id}/temp/internal` | °C (inside hive body) | Float |
-| `hivesense/hive/{id}/temp/external` | °C (ambient) | Float |
-| `hivesense/hive/{id}/humidity/internal` | % RH | Float |
-| `hivesense/hive/{id}/humidity/external` | % RH | Float |
-| `hivesense/hive/{id}/bees/in` | Cumulative count since last reset | Integer |
-| `hivesense/hive/{id}/bees/out` | Cumulative count since last reset | Integer |
-| `hivesense/hive/{id}/bees/activity` | Rolling 30-min window count | Integer |
-| `hivesense/hive/{id}/battery` | Battery % estimated from voltage | Integer |
-| `hivesense/hive/{id}/rssi` | ESP-NOW signal strength to collector | Integer |
+| `combsense/hive/{id}/weight` | kg | Float |
+| `combsense/hive/{id}/temp/internal` | °C (inside hive body) | Float |
+| `combsense/hive/{id}/temp/external` | °C (ambient) | Float |
+| `combsense/hive/{id}/humidity/internal` | % RH | Float |
+| `combsense/hive/{id}/humidity/external` | % RH | Float |
+| `combsense/hive/{id}/bees/in` | Cumulative count since last reset | Integer |
+| `combsense/hive/{id}/bees/out` | Cumulative count since last reset | Integer |
+| `combsense/hive/{id}/bees/activity` | Rolling 30-min window count | Integer |
+| `combsense/hive/{id}/battery` | Battery % estimated from voltage | Integer |
+| `combsense/hive/{id}/rssi` | ESP-NOW signal strength to collector | Integer |
 
 #### 4.3.4 iOS App MQTT Integration
 
-The HiveSense iOS app uses an MQTT client library (e.g., CocoaMQTT) to subscribe to the broker:
+The CombSense iOS app uses an MQTT client library (e.g., CocoaMQTT) to subscribe to the broker:
 
 | Feature | Implementation |
 |---|---|
 | Library | CocoaMQTT (Swift, SPM compatible) |
 | Connection | TLS to HiveMQ Cloud endpoint |
-| Subscribe | `hivesense/hive/+/#` — all hives, all topics |
+| Subscribe | `combsense/hive/+/#` — all hives, all topics |
 | Data storage | Incoming readings saved to SwiftData `SensorReading` model |
 | Background | iOS background fetch for periodic pull when app is closed |
 | Notifications | Push alerts for critical events (weight drop, temp anomaly) |
@@ -495,20 +495,20 @@ Service UUID: 0xHVSN (custom)
 ├── Characteristic: Reading Count (read)
 │   └── uint16_t — number of stored readings
 ├── Characteristic: Hive ID (read/write)
-│   └── char[16] — maps to HiveSense app hive
+│   └── char[16] — maps to CombSense app hive
 └── Characteristic: Clear Log (write)
     └── uint8_t — write 0x01 to clear after sync
 ```
 
 ---
 
-## 8. HiveSense iOS App Integration Spec
+## 8. CombSense iOS App Integration Spec
 
-This section defines what must be built in the HiveSense iOS app (separate repo: `sjordan0228/hivesense`) to receive, store, and display sensor data from the monitoring hardware.
+This section defines what must be built in the CombSense iOS app (separate repo: `sjordan0228/combsense`) to receive, store, and display sensor data from the monitoring hardware.
 
 ### 8.1 Existing App Context
 
-The HiveSense iOS app is a SwiftUI + SwiftData app (iOS 17+) for beekeepers. It already has:
+The CombSense iOS app is a SwiftUI + SwiftData app (iOS 17+) for beekeepers. It already has:
 - Yard and Hive models in SwiftData with full CRUD
 - NFC tag read/write for hive identification
 - Voice-based inspections via WhisperKit
@@ -556,8 +556,8 @@ Relationship: `Hive` gets a new `@Relationship(deleteRule: .cascade, inverse: \S
 
 ### 8.3 BLE Integration — CoreBluetooth
 
-**Service:** HiveSenseBLEService (new file)
-- Scans for peripherals advertising the HiveSense service UUID
+**Service:** CombSenseBLEService (new file)
+- Scans for peripherals advertising the CombSense service UUID
 - Discovers hive nodes, reads their hive ID characteristic
 - Matches to existing Hive in SwiftData by hiveId
 - Downloads sensor log characteristic (array of readings)
@@ -566,14 +566,14 @@ Relationship: `Hive` gets a new `@Relationship(deleteRule: .cascade, inverse: \S
 
 **BLE Flow in App:**
 1. User opens Yard Mode or Scan tab → app starts BLE scan
-2. Discovers HiveSense peripherals → shows "3 hives with sensor data"
+2. Discovers CombSense peripherals → shows "3 hives with sensor data"
 3. User taps "Sync Sensors" → connects to each, downloads logs
 4. Creates `SensorReading` entries in SwiftData, linked to matching Hive
 5. Sends clear command to ESP32 → frees flash storage
 
 **Pairing Flow:**
 1. User goes to YardDetailScreen → taps "Pair Sensor" on a hive
-2. App scans for unpaired HiveSense BLE devices
+2. App scans for unpaired CombSense BLE devices
 3. User selects the device (identified by signal strength / proximity)
 4. App writes the hive's `hiveId` to the BLE device's Hive ID characteristic
 5. Stores the device's MAC address on the Hive model for future auto-connect
@@ -590,7 +590,7 @@ var lastSensorSync: Date?      // when data was last pulled
 
 **Service:** MQTTService (new file, @MainActor ObservableObject)
 - Connects to HiveMQ Cloud endpoint via TLS
-- Subscribes to `hivesense/hive/+/#`
+- Subscribes to `combsense/hive/+/#`
 - Parses incoming messages into `SensorReading` entries
 - Resolves hive ID from topic path → links to SwiftData Hive
 - Runs as background service, reconnects on disconnect
@@ -672,18 +672,18 @@ The existing DashboardScreen metrics row gets updated:
 - **Alerts** count includes sensor-triggered alerts
 - **Needs Attention** section includes sensor anomalies
 
-### 8.8 Files to Create in HiveSense iOS App
+### 8.8 Files to Create in CombSense iOS App
 
 | File | Purpose |
 |---|---|
-| `HiveSense/Models/SensorReading.swift` | SwiftData model |
-| `HiveSense/Models/Enums/ReadingSource.swift` | BLE vs MQTT source enum |
-| `HiveSense/Services/HiveSenseBLEService.swift` | CoreBluetooth BLE client |
-| `HiveSense/Services/MQTTService.swift` | CocoaMQTT wrapper |
-| `HiveSense/Services/SensorAlertService.swift` | Threshold checking + notifications |
-| `HiveSense/Features/Hive/SensorsTab.swift` | Sensor data display with charts |
-| `HiveSense/Features/Settings/CloudMonitoringView.swift` | MQTT configuration UI |
-| `HiveSense/Features/Yard/SensorSyncView.swift` | BLE sync UI for yard visits |
+| `CombSense/Models/SensorReading.swift` | SwiftData model |
+| `CombSense/Models/Enums/ReadingSource.swift` | BLE vs MQTT source enum |
+| `CombSense/Services/CombSenseBLEService.swift` | CoreBluetooth BLE client |
+| `CombSense/Services/MQTTService.swift` | CocoaMQTT wrapper |
+| `CombSense/Services/SensorAlertService.swift` | Threshold checking + notifications |
+| `CombSense/Features/Hive/SensorsTab.swift` | Sensor data display with charts |
+| `CombSense/Features/Settings/CloudMonitoringView.swift` | MQTT configuration UI |
+| `CombSense/Features/Yard/SensorSyncView.swift` | BLE sync UI for yard visits |
 
 ### 8.9 Dependencies to Add
 
@@ -697,15 +697,15 @@ The existing DashboardScreen metrics row gets updated:
 
 ## 9. Future Enhancements
 
-- **RFID hive identification** — NFC tag per hive for automatic node-to-hive association (already built in HiveSense app)
+- **RFID hive identification** — NFC tag per hive for automatic node-to-hive association (already built in CombSense app)
 - **Audio monitoring** — microphone + FFT analysis for swarm detection via colony sound signature changes
 - **TFT display on collector** — local yard status without needing phone
 - **Predictive swarming alerts** — ML model trained on weight + bee activity patterns to predict swarm events 24–48 hrs ahead
 - **Multi-yard support** — multiple collectors reporting to same MQTT broker, differentiated by yard ID in topic path
 - **OTA firmware updates** — push firmware updates to hive nodes via collector relay
-- **HiveSense app sensor tab** — weight/temp/humidity charts on HiveDetailScreen, BLE sync UI, alert configuration
+- **CombSense app sensor tab** — weight/temp/humidity charts on HiveDetailScreen, BLE sync UI, alert configuration
 
 ---
 
-*HiveSense Technical Datasheet — Rev 1.1 — 2026 — Internal Design Document*
+*CombSense Technical Datasheet — Rev 1.1 — 2026 — Internal Design Document*
 *Updated: Added BLE direct communication, HiveMQ Cloud MQTT broker, iOS app integration, sensor gate installation details*

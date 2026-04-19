@@ -7,7 +7,7 @@
 
 namespace {
 
-constexpr const char* NVS_NS = "hivesense";
+constexpr const char* NVS_NS = "combsense";
 constexpr uint16_t CONSOLE_WAIT_MS = 3000;
 
 const char* knownKeys[] = {
@@ -222,7 +222,7 @@ void runConsole() {
     Preferences prefs;
     prefs.begin(NVS_NS, false);  // read-write
 
-    Serial.println("\n=== HiveSense Serial Console ===");
+    Serial.println("\n=== CombSense Serial Console ===");
     Serial.println("Type 'help' for commands, 'exit' to resume boot.\n");
 
     char line[128];

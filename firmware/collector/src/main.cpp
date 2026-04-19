@@ -63,7 +63,7 @@ void runPublishCycle() {
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("\n[MAIN] HiveSense Collector — starting");
+    Serial.println("\n[MAIN] CombSense Collector — starting");
 
     SerialConsole::checkForConsole();
 

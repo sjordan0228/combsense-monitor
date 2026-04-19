@@ -44,7 +44,7 @@ void runPublishCycle() {
 void setup() {
     Serial.begin(115200);
     delay(3000);
-    Serial.println("\n[MAIN] HiveSense WiFi Collector — ESP32-S3-Zero");
+    Serial.println("\n[MAIN] CombSense WiFi Collector — ESP32-S3-Zero");
 
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);

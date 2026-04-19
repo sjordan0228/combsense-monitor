@@ -12,7 +12,7 @@ RTC_DATA_ATTR static uint32_t bootCount = 0;
 /// Ensure NVS namespace exists — creates it on first boot.
 void initializeNvs() {
     Preferences prefs;
-    prefs.begin("hivesense", false);  // read-write creates namespace if missing
+    prefs.begin("combsense", false);  // read-write creates namespace if missing
     prefs.end();
 }
 
@@ -20,7 +20,7 @@ void setup() {
     Serial.begin(115200);
     bootCount++;
 
-    Serial.printf("\n[MAIN] HiveSense Node — Phase 1 | Boot #%u\n", bootCount);
+    Serial.printf("\n[MAIN] CombSense Node — Phase 1 | Boot #%u\n", bootCount);
 
     initializeNvs();
     SerialConsole::checkForConsole();

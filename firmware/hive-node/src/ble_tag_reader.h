@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-/// Scans for up to two HiveSense wireless sensor tags via BLE advertisement.
+/// Scans for up to two CombSense wireless sensor tags via BLE advertisement.
 /// Tag 1 = brood box (bottom), Tag 2 = top (super/upper box).
 namespace BleTagReader {
 

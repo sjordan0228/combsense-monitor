@@ -10,13 +10,13 @@
 namespace {
 
 Adafruit_SHT31 sht;
-char tagName[32] = "HiveSense-Tag-001";
+char tagName[32] = "CombSense-Tag-001";
 uint16_t advIntervalSec = DEFAULT_ADV_INTERVAL_SEC;
 
 void loadConfig() {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
-    String name = prefs.getString(NVS_KEY_TAG_NAME, "HiveSense-Tag-001");
+    String name = prefs.getString(NVS_KEY_TAG_NAME, "CombSense-Tag-001");
     advIntervalSec = prefs.getUShort(NVS_KEY_ADV_INT, DEFAULT_ADV_INTERVAL_SEC);
     prefs.end();
 

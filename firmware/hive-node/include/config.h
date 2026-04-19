@@ -56,20 +56,20 @@ constexpr uint16_t OTA_NVS_SAVE_INTERVAL      = 50;
 constexpr uint16_t MAX_STORED_READINGS = 500;
 
 // =============================================================================
-// BLE UUIDs — derived from "HiveSense" ASCII
+// BLE UUIDs — first 10 bytes encode "CombSense" ASCII, last 2 bytes = char index
 // =============================================================================
 
-constexpr const char* BLE_SERVICE_UUID       = "4E6F7200-7468-6976-6553-656E73650000";
-constexpr const char* BLE_CHAR_SENSOR_LOG    = "4E6F7200-7468-6976-6553-656E73650001";
-constexpr const char* BLE_CHAR_READING_COUNT = "4E6F7200-7468-6976-6553-656E73650002";
-constexpr const char* BLE_CHAR_HIVE_ID       = "4E6F7200-7468-6976-6553-656E73650003";
-constexpr const char* BLE_CHAR_CLEAR_LOG     = "4E6F7200-7468-6976-6553-656E73650004";
+constexpr const char* BLE_SERVICE_UUID       = "436F6D62-5365-6E73-6500-000000000000";
+constexpr const char* BLE_CHAR_SENSOR_LOG    = "436F6D62-5365-6E73-6500-000000000001";
+constexpr const char* BLE_CHAR_READING_COUNT = "436F6D62-5365-6E73-6500-000000000002";
+constexpr const char* BLE_CHAR_HIVE_ID       = "436F6D62-5365-6E73-6500-000000000003";
+constexpr const char* BLE_CHAR_CLEAR_LOG     = "436F6D62-5365-6E73-6500-000000000004";
 
 // =============================================================================
 // NVS Keys
 // =============================================================================
 
-constexpr const char* NVS_NAMESPACE      = "hivesense";
+constexpr const char* NVS_NAMESPACE      = "combsense";
 constexpr const char* NVS_KEY_HIVE_ID    = "hive_id";
 constexpr const char* NVS_KEY_COLLECTOR  = "collector_mac";
 constexpr const char* NVS_KEY_DAY_START  = "day_start";

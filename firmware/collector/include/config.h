@@ -49,7 +49,7 @@ constexpr uint8_t MAX_HIVE_NODES = 20;
 // NVS Keys
 // =============================================================================
 
-constexpr const char* NVS_NAMESPACE      = "hivesense";
+constexpr const char* NVS_NAMESPACE      = "combsense";
 constexpr const char* NVS_KEY_MQTT_HOST  = "mqtt_host";
 constexpr const char* NVS_KEY_MQTT_PORT  = "mqtt_port";
 constexpr const char* NVS_KEY_MQTT_USER  = "mqtt_user";
@@ -59,11 +59,11 @@ constexpr const char* NVS_KEY_MQTT_PASS  = "mqtt_pass";
 // MQTT Topics
 // =============================================================================
 
-constexpr const char* MQTT_TOPIC_PREFIX = "hivesense/hive/";
-constexpr const char* MQTT_OTA_TOPIC    = "hivesense/ota/start";
+constexpr const char* MQTT_TOPIC_PREFIX = "combsense/hive/";
+constexpr const char* MQTT_OTA_TOPIC    = "combsense/ota/start";
 
 // =============================================================================
 // OTA
 // =============================================================================
 
-constexpr const char* GITHUB_RELEASE_BASE = "https://github.com/sjordan0228/hivesense-monitor/releases/download/";
+constexpr const char* GITHUB_RELEASE_BASE = "https://github.com/sjordan0228/combsense-monitor/releases/download/";

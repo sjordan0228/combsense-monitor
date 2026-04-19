@@ -22,7 +22,7 @@ constexpr uint16_t ADV_DURATION_MS         = 200;
 // NVS
 // =============================================================================
 
-constexpr const char* NVS_NAMESPACE    = "hivesense";
+constexpr const char* NVS_NAMESPACE    = "combsense";
 constexpr const char* NVS_KEY_TAG_NAME = "tag_name";
 constexpr const char* NVS_KEY_ADV_INT  = "adv_interval";
 

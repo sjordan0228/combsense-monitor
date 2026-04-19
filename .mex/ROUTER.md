@@ -39,13 +39,13 @@ Read this file fully before doing anything else in this session.
 
 ### Not yet built
 - Phase 2: IR bee counter (8-pair beam-break array via CD74HC4067 mux)
-- HiveSense iOS app sensor integration (BLE, MQTT, SensorReading model, SensorsTab)
+- CombSense iOS app sensor integration (BLE, MQTT, SensorReading model, SensorsTab)
 - 3D printed enclosures and sensor gate
 - HiveMQ Cloud account setup
 
 **Related repos:**
-- `sjordan0228/hivesense` — iOS app (SwiftUI + SwiftData)
-- `sjordan0228/hivesense-monitor` — this repo (hardware + firmware)
+- `sjordan0228/combsense` — iOS app (SwiftUI + SwiftData)
+- `sjordan0228/combsense-monitor` — this repo (hardware + firmware)
 
 ## Routing Table
 

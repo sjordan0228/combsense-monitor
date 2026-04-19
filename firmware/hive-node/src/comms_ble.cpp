@@ -130,7 +130,7 @@ bool initialize() {
     String hiveId = prefs.getString(NVS_KEY_HIVE_ID, "HIVE-001");
     prefs.end();
 
-    String deviceName = "HiveSense-" + hiveId;
+    String deviceName = "CombSense-" + hiveId;
 
     NimBLEDevice::init(deviceName.c_str());
     NimBLEDevice::setMTU(512);

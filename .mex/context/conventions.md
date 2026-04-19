@@ -9,7 +9,7 @@ last_updated: 2026-04-11
 ## Project Structure
 
 ```
-hivesense-monitor/
+combsense-monitor/
   firmware/
     hive-node/       — Freenove ESP32-S3 Lite hive node firmware
     collector/       — LilyGO T-SIM7080G yard collector firmware

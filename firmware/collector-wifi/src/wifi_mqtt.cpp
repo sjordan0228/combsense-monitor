@@ -85,9 +85,9 @@ bool connectMqtt() {
 
     bool connected;
     if (strlen(mqttUser) > 0) {
-        connected = mqtt.connect("hivesense-collector", mqttUser, mqttPass);
+        connected = mqtt.connect("combsense-collector", mqttUser, mqttPass);
     } else {
-        connected = mqtt.connect("hivesense-collector");
+        connected = mqtt.connect("combsense-collector");
     }
 
     if (!connected) {
