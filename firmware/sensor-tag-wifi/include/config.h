@@ -68,5 +68,4 @@ constexpr uint8_t  DS18B20_RESOLUTION_BITS      = 12;
 // Payload
 // =============================================================================
 
-constexpr uint8_t PAYLOAD_VERSION = 1;
-constexpr size_t  PAYLOAD_MAX_LEN = 160;
+constexpr size_t PAYLOAD_MAX_LEN = 160;
