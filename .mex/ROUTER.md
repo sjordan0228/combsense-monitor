@@ -52,7 +52,8 @@ Read this file fully before doing anything else in this session.
   - Direct MQTT to local Mosquitto, RTC ring buffer for offline resilience
   - BSSID caching in RTC for fast reconnect
   - 18650 + solar powered, 5-min sample cadence by default
-  - Native Unity tests for payload serialization
+  - Native Unity tests for payload serialization (6 passing, incl. t=0 case)
+  - Epoch timestamps via NTP sync in drainBuffer(); pre-sync readings emit t=0
   - Bench-validated with DS18B20: end-to-end publish to Mosquitto at 192.168.1.82 works
   - USB-CDC serial console provisioning (WiFi/MQTT creds via `tools/provision_tag.py`)
 

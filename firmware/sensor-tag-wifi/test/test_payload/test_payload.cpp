@@ -106,7 +106,7 @@ void test_serialize_emits_t_zero_when_timestamp_unset() {
     char buf[160];
     int n = Payload::serialize("ab12cd34", r, buf, sizeof(buf));
     TEST_ASSERT_GREATER_THAN(0, n);
-    TEST_ASSERT_NOT_NULL(strstr(buf, "\"t\":0"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"t\":0,"));
 }
 
 int main(int, char**) {
