@@ -15,6 +15,8 @@ class User(AbstractUser):
     ]
 
     username = None
+    first_name = None  # replaced by display_name
+    last_name = None   # replaced by display_name
     email = models.EmailField("email address", unique=True)
     display_name = models.CharField(max_length=120, blank=True)
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default=ROLE_BEEKEEPER)
