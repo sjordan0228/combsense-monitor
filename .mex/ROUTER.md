@@ -1,7 +1,7 @@
 ---
 name: router
 description: Session bootstrap and navigation hub. Read at the start of every session before any task.
-last_updated: 2026-04-20 (combsense-web Task 6: templated home view with logout button and admin link)
+last_updated: 2026-04-20 (combsense-web Plan A complete: auth + deploy artifacts for combsense-web LXC at 192.168.1.61)
 ---
 
 ## Infrastructure
@@ -17,6 +17,12 @@ last_updated: 2026-04-20 (combsense-web Task 6: templated home view with logout 
   - Tokens at `/root/.combsense-tsdb-creds` (mode 600): `admin_token`, `telegraf_write_token`, `ios_read_token`
   - Systemd sandboxing drop-ins at `/etc/systemd/system/{grafana-server,telegraf}.service.d/override.conf` (required for unprivileged LXC — see memory)
   - Daily Influx backup via `combsense-backup.timer` → `/var/backups/combsense-tsdb/`, 14-day retention
+- **combsense-web LXC:** 192.168.1.61 — Proxmox LXC 125, NFS-backed, Debian 12 (unprivileged)
+  - **PostgreSQL 15** on 127.0.0.1:5432 (db: `combsense`, user: `combsense`)
+  - **Redis 7** on 127.0.0.1:6379 (for Celery later)
+  - **Django (gunicorn)** on 127.0.0.1:8000 via `combsense-web.service`
+  - Credentials at `/root/.combsense-web-creds` (mode 600)
+  - Systemd drop-in at `/etc/systemd/system/combsense-web.service.d/override.conf` (unprivileged LXC workaround)
 - **Remote:** only `origin` on GitHub (`sjordan0228/combsense-monitor`). Branches: `main` (prod), `dev` (integration).
 
 # Session Bootstrap
@@ -69,17 +75,19 @@ Read this file fully before doing anything else in this session.
   - `HiveHistoryView` — Swift Charts view with 24h/7d/30d/1y range picker, reached via NavigationLink from hive detail
   - Settings pane extended with Influx URL + org (AppStorage) and read token (Keychain)
 
-- **combsense-web Django scaffold** (`web/`) — Tasks 2–4 done
+- **combsense-web Plan A complete** (`web/`, `deploy/web/`, `combsense-web` LXC)
   - `web/combsense/` project package: env-driven `settings.py`, `urls.py` routes admin + accounts + core
-  - `web/accounts/`: custom User model (email login), `EmailAuthenticationForm`, `CombSenseLoginView`, `CombSenseLogoutView` (POST-only), `accounts:login` / `accounts:logout` / 4 password-reset URLs namespaced; 15 tests passing
-  - `EMAIL_BACKEND` reads from `DJANGO_EMAIL_BACKEND` env (console fallback for dev; Plan D wires SMTP); comment warns on silent prod failure mode
-  - `web/core/`: `core:home` view (login_required, template-rendered), `core.urls` namespace wired; 3 view tests (auth guard, email render, logout link)
-  - `web/templates/base.html` (minimal inline-styled shell), `web/templates/registration/login.html`
-  - `web/requirements.txt` (Django 5.2.13 LTS — upgraded from 5.0.9 to fix Python 3.14 context copy regression), `web/.env.example`, `web/pytest.ini`, `web/conftest.py`
-  - `web/.venv/` (Python 3.14 locally; plan targets Python 3.11 for LXC deploy; not committed); `web/.env` (not committed)
+  - `web/accounts/`: custom User model (email login, `role` field), `EmailAuthenticationForm`, `CombSenseLoginView`, `CombSenseLogoutView` (POST-only), `accounts:login` / `accounts:logout` / 4 password-reset URLs namespaced
+  - `EMAIL_BACKEND` reads from `DJANGO_EMAIL_BACKEND` env (console fallback for dev; Plan D wires SMTP); warning comment on silent prod failure mode
+  - `web/core/`: `core:home` template-rendered view (login_required) with logout form + conditional admin link
+  - `web/templates/`: `base.html` shell, `registration/login.html`, password-reset templates; `core/templates/core/home.html`
+  - `web/requirements.txt` (Django 5.2.13 LTS — upgraded from 5.0.9 to fix Python 3.14 context copy regression)
+  - **Tests:** 18 passing across `accounts` and `core` (8 model, 4 auth view, 3 password reset, 3 home view)
+  - **Deploy artifacts** (`deploy/web/`): `combsense-web.service` (gunicorn systemd unit), `combsense-web.service.d/override.conf` (unprivileged LXC sandboxing workaround), `env.template`, `provision.sh` (idempotent bootstrap via `env --file`), `README.md` (operator runbook)
+  - `web/.venv/` (Python 3.14 locally; LXC runs Python 3.11; not committed); `web/.env` (not committed)
 
 ### Not yet built
-- combsense-web Tasks 7–N: hive list/detail, deployment
+- combsense-web Plan B onward: MQTT ingest watcher (auto-claim devices), hive list/detail, Influx reader, Chart.js rendering, alerts, OTA dispatch
 - Phase 2: IR bee counter (8-pair beam-break array via CD74HC4067 mux)
 - CombSense iOS app BLE/MQTT live-reading integration (separate from history)
 - 3D printed enclosures and sensor gate
@@ -103,6 +111,7 @@ Read this file fully before doing anything else in this session.
 | TSDB / Influx / Telegraf / downsampling | `deploy/tsdb/` + Infrastructure section above |
 | iOS history feature | `sjordan0228/combsense` repo (separate session) |
 | Django web dashboard (combsense-web) | `web/` directory |
+| combsense-web LXC ops | deploy/web/README.md |
 
 ## Behavioural Contract
 
