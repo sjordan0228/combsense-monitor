@@ -104,3 +104,10 @@ LOGOUT_REDIRECT_URL = "accounts:login"
 
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14  # 14 days
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Email — console backend in dev; SMTP configured via env in deploy (Plan D)
+EMAIL_BACKEND = os.environ.get(
+    "DJANGO_EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "noreply@combsense.local")
