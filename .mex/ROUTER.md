@@ -1,7 +1,7 @@
 ---
 name: router
 description: Session bootstrap and navigation hub. Read at the start of every session before any task.
-last_updated: 2026-04-20 (Django web scaffold landed; combsense-web Task 2 complete)
+last_updated: 2026-04-20 (combsense-web Task 4 complete: login/logout views, base template)
 ---
 
 ## Infrastructure
@@ -69,17 +69,16 @@ Read this file fully before doing anything else in this session.
   - `HiveHistoryView` — Swift Charts view with 24h/7d/30d/1y range picker, reached via NavigationLink from hive detail
   - Settings pane extended with Influx URL + org (AppStorage) and read token (Keychain)
 
-- **combsense-web Django scaffold** (`web/`) — Task 2 done
-  - `web/combsense/` project package: env-driven `settings.py`, stock `urls.py`/`wsgi.py`/`asgi.py`
-  - `web/accounts/` skeleton (empty `__init__.py`, `apps.py`, `models.py` stub — Task 3 adds full User model)
-  - `web/core/` skeleton (empty `__init__.py`, `apps.py`)
-  - `web/requirements.txt`, `web/.env.example`, `web/pytest.ini`, `web/conftest.py`
-  - `web/.venv/` (local venv follows host Python; plan targets Python 3.11 for LXC deploy; not committed); `web/.env` (not committed)
-  - `manage.py check` passes clean
+- **combsense-web Django scaffold** (`web/`) — Tasks 2–4 done
+  - `web/combsense/` project package: env-driven `settings.py`, `urls.py` routes admin + accounts + core
+  - `web/accounts/`: custom User model (email login), `EmailAuthenticationForm`, `CombSenseLoginView`, `CombSenseLogoutView` (POST-only), `accounts:login` / `accounts:logout` namespaced URLs; 12 tests passing
+  - `web/core/`: `core:home` placeholder (login_required), `core.urls` namespace wired
+  - `web/templates/base.html` (minimal inline-styled shell), `web/templates/registration/login.html`
+  - `web/requirements.txt` (Django 5.2.13 LTS — upgraded from 5.0.9 to fix Python 3.14 context copy regression), `web/.env.example`, `web/pytest.ini`, `web/conftest.py`
+  - `web/.venv/` (Python 3.14 locally; plan targets Python 3.11 for LXC deploy; not committed); `web/.env` (not committed)
 
 ### Not yet built
-- combsense-web Task 3: custom User model + TDD (accounts app)
-- combsense-web Tasks 4–N: views, URLs, templates, deployment
+- combsense-web Tasks 5–N: password reset, hive list/detail, deployment
 - Phase 2: IR bee counter (8-pair beam-break array via CD74HC4067 mux)
 - CombSense iOS app BLE/MQTT live-reading integration (separate from history)
 - 3D printed enclosures and sensor gate
