@@ -74,7 +74,7 @@ Read this file fully before doing anything else in this session.
   - `web/accounts/` skeleton (empty `__init__.py`, `apps.py`, `models.py` stub — Task 3 adds full User model)
   - `web/core/` skeleton (empty `__init__.py`, `apps.py`)
   - `web/requirements.txt`, `web/.env.example`, `web/pytest.ini`, `web/conftest.py`
-  - `web/.venv/` (Python 3.14, not committed); `web/.env` (not committed)
+  - `web/.venv/` (local venv follows host Python; plan targets Python 3.11 for LXC deploy; not committed); `web/.env` (not committed)
   - `manage.py check` passes clean
 
 ### Not yet built
