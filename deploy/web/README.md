@@ -24,7 +24,7 @@ Idempotent — pulls from origin, rebuilds venv, re-migrates, restarts.
 
 ```
 cd /opt/combsense-web
-sudo -u combsense env $(grep -v '^#' /etc/combsense-web/env | xargs) \
+sudo -u combsense env --file /etc/combsense-web/env \
   .venv/bin/python manage.py createsuperuser
 ```
 

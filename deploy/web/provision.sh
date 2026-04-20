@@ -45,23 +45,19 @@ fi
 
 # Django migrate + collectstatic
 cd "${INSTALL_DIR}"
-sudo -u "${APP_USER}" --preserve-env=PATH \
-  env $(grep -v '^#' /etc/combsense-web/env | xargs) \
+sudo -u "${APP_USER}" env --file /etc/combsense-web/env \
   "${VENV_DIR}/bin/python" manage.py migrate --noinput
 
-sudo -u "${APP_USER}" --preserve-env=PATH \
-  env $(grep -v '^#' /etc/combsense-web/env | xargs) \
+sudo -u "${APP_USER}" env --file /etc/combsense-web/env \
   "${VENV_DIR}/bin/python" manage.py collectstatic --noinput
 
-# Install systemd unit if not present
-if [ ! -f /etc/systemd/system/combsense-web.service ]; then
-  install -m 644 "${CHECKOUT_DIR}/deploy/web/combsense-web.service" /etc/systemd/system/
-  install -d /etc/systemd/system/combsense-web.service.d
-  install -m 644 "${CHECKOUT_DIR}/deploy/web/combsense-web.service.d/override.conf" \
-          /etc/systemd/system/combsense-web.service.d/
-  systemctl daemon-reload
-  systemctl enable combsense-web.service
-fi
+# Install systemd unit
+install -m 644 "${CHECKOUT_DIR}/deploy/web/combsense-web.service" /etc/systemd/system/
+install -d /etc/systemd/system/combsense-web.service.d
+install -m 644 "${CHECKOUT_DIR}/deploy/web/combsense-web.service.d/override.conf" \
+        /etc/systemd/system/combsense-web.service.d/
+systemctl daemon-reload
+systemctl enable combsense-web.service
 
 systemctl restart combsense-web.service
 systemctl status combsense-web.service --no-pager
