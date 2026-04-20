@@ -19,3 +19,13 @@ build/
 # Ollama output artifacts
 ollama-output-*.md
 tools/.venv/
+
+# Django web app
+web/.env
+web/.venv/
+web/staticfiles/
+web/**/__pycache__/
+web/**/*.pyc
+web/.pytest_cache/
+web/htmlcov/
+web/.coverage
