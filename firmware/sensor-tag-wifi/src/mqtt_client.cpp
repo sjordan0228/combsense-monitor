@@ -67,12 +67,24 @@ bool publish(const char* deviceId, const Reading& r) {
     }
 
     bool ok = pubsub.publish(topic, payload, false);
-    if (!ok) Serial.println("[MQTT] publish failed");
-    return ok;
+    if (!ok) {
+        Serial.printf("[MQTT] publish failed state=%d\n", pubsub.state());
+        return false;
+    }
+    // QoS 0 publishes land in the TCP write buffer and return true before the
+    // broker has actually received them. WiFiClient::flush() on Arduino-ESP32
+    // checks RX, not TX — so give TCP real wall-clock time to push the bytes
+    // out before the caller tears down WiFi.
+    for (int i = 0; i < 20; i++) {
+        pubsub.loop();
+        delay(50);
+    }
+    return true;
 }
 
 void disconnect() {
     pubsub.disconnect();
+    delay(100);
     wifiClient.stop();
 }
 
