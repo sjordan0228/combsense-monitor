@@ -71,11 +71,31 @@ void test_serialize_emits_only_valid_humidity_channel() {
         buf);
 }
 
+void test_serialize_emits_null_for_nan_temps() {
+    // Firmware must emit JSON `null` (not `nan`) so downstream JSON parsers
+    // (Telegraf json_v2, Swift JSONDecoder, etc.) don't reject the message.
+    Reading r {
+        .timestamp = 1712345678,
+        .temp1 = 21.50f,
+        .temp2 = NAN,           // external DS18B20 not wired
+        .humidity1 = NAN,
+        .humidity2 = NAN,
+        .battery_pct = 0,
+    };
+    char buf[160];
+    int n = Payload::serialize("c5fffe12", r, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0, n);
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"id\":\"c5fffe12\",\"t\":1712345678,\"t1\":21.50,\"t2\":null,\"b\":0}",
+        buf);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_serialize_full_reading_with_humidity);
     RUN_TEST(test_serialize_ds18b20_reading_omits_humidity);
     RUN_TEST(test_serialize_returns_negative_on_undersized_buffer);
     RUN_TEST(test_serialize_emits_only_valid_humidity_channel);
+    RUN_TEST(test_serialize_emits_null_for_nan_temps);
     return UNITY_END();
 }
