@@ -1,0 +1,22 @@
+[Unit]
+Description=CombSense web — Django/gunicorn
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=combsense
+Group=combsense
+WorkingDirectory=/opt/combsense-web
+EnvironmentFile=/etc/combsense-web/env
+ExecStart=/opt/combsense-web/.venv/bin/gunicorn \
+  --bind 127.0.0.1:8000 \
+  --workers 3 \
+  --access-logfile - \
+  --error-logfile - \
+  combsense.wsgi:application
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
