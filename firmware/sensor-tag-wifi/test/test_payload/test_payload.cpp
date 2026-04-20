@@ -90,6 +90,25 @@ void test_serialize_emits_null_for_nan_temps() {
         buf);
 }
 
+void test_serialize_emits_t_zero_when_timestamp_unset() {
+    // Readings buffered before the first NTP sync have timestamp=0. The payload
+    // must serialize this as "t":0 so Telegraf can apply the t=0 fallback rule
+    // and substitute the ingest time rather than silently emitting `nan` or
+    // omitting the field.
+    Reading r {
+        .timestamp = 0,
+        .temp1 = 20.00f,
+        .temp2 = 21.00f,
+        .humidity1 = NAN,
+        .humidity2 = NAN,
+        .battery_pct = 50,
+    };
+    char buf[160];
+    int n = Payload::serialize("ab12cd34", r, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0, n);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"t\":0"));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_serialize_full_reading_with_humidity);
@@ -97,5 +116,6 @@ int main(int, char**) {
     RUN_TEST(test_serialize_returns_negative_on_undersized_buffer);
     RUN_TEST(test_serialize_emits_only_valid_humidity_channel);
     RUN_TEST(test_serialize_emits_null_for_nan_temps);
+    RUN_TEST(test_serialize_emits_t_zero_when_timestamp_unset);
     return UNITY_END();
 }
