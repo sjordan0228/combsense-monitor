@@ -18,7 +18,8 @@
         "allValue": ".*",
         "multi": true,
         "refresh": 1,
-        "sort": 1
+        "sort": 1,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
       }
     ]
   },
