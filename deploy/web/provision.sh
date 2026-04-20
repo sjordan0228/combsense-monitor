@@ -41,13 +41,17 @@ if [ ! -f /etc/combsense-web/env ]; then
   exit 1
 fi
 
-# Django migrate + collectstatic
+# Django migrate + collectstatic — load env via bash so values with spaces
+# or metacharacters survive intact (plain `env` has no --file on Debian 12).
 cd "${INSTALL_DIR}/web"
-sudo -u "${APP_USER}" env --file /etc/combsense-web/env \
-  "${VENV_DIR}/bin/python" manage.py migrate --noinput
-
-sudo -u "${APP_USER}" env --file /etc/combsense-web/env \
-  "${VENV_DIR}/bin/python" manage.py collectstatic --noinput
+run_with_env() {
+  sudo -u "${APP_USER}" bash -c '
+    set -a; . /etc/combsense-web/env; set +a
+    exec "$@"
+  ' _ "$@"
+}
+run_with_env "${VENV_DIR}/bin/python" manage.py migrate --noinput
+run_with_env "${VENV_DIR}/bin/python" manage.py collectstatic --noinput
 
 # Install systemd unit
 install -m 644 "${CHECKOUT_DIR}/deploy/web/combsense-web.service" /etc/systemd/system/
