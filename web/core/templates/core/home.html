@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}CombSense{% endblock %}
+
+{% block content %}
+<div style="max-width: 720px; margin: 40px auto; padding: 0 20px;">
+  <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h1 style="margin: 0">CombSense Admin</h1>
+    <form method="post" action="{% url 'accounts:logout' %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit" style="background:#888">Sign out</button>
+    </form>
+  </header>
+
+  <p>Welcome, <strong>{{ request.user.email }}</strong> (role: {{ request.user.role }}).</p>
+  <p>This is the placeholder home. Real dashboard lands in Plan C.</p>
+
+  {% if request.user.is_staff %}
+    <p><a href="{% url 'admin:index' %}">Open Django admin</a> for low-level CRUD.</p>
+  {% endif %}
+</div>
+{% endblock %}

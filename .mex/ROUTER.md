@@ -1,7 +1,7 @@
 ---
 name: router
 description: Session bootstrap and navigation hub. Read at the start of every session before any task.
-last_updated: 2026-04-20 (combsense-web Task 4 complete: login/logout views, base template)
+last_updated: 2026-04-20 (combsense-web Task 6: templated home view with logout button and admin link)
 ---
 
 ## Infrastructure
@@ -71,14 +71,15 @@ Read this file fully before doing anything else in this session.
 
 - **combsense-web Django scaffold** (`web/`) — Tasks 2–4 done
   - `web/combsense/` project package: env-driven `settings.py`, `urls.py` routes admin + accounts + core
-  - `web/accounts/`: custom User model (email login), `EmailAuthenticationForm`, `CombSenseLoginView`, `CombSenseLogoutView` (POST-only), `accounts:login` / `accounts:logout` namespaced URLs; 12 tests passing
-  - `web/core/`: `core:home` placeholder (login_required), `core.urls` namespace wired
+  - `web/accounts/`: custom User model (email login), `EmailAuthenticationForm`, `CombSenseLoginView`, `CombSenseLogoutView` (POST-only), `accounts:login` / `accounts:logout` / 4 password-reset URLs namespaced; 15 tests passing
+  - `EMAIL_BACKEND` reads from `DJANGO_EMAIL_BACKEND` env (console fallback for dev; Plan D wires SMTP); comment warns on silent prod failure mode
+  - `web/core/`: `core:home` view (login_required, template-rendered), `core.urls` namespace wired; 3 view tests (auth guard, email render, logout link)
   - `web/templates/base.html` (minimal inline-styled shell), `web/templates/registration/login.html`
   - `web/requirements.txt` (Django 5.2.13 LTS — upgraded from 5.0.9 to fix Python 3.14 context copy regression), `web/.env.example`, `web/pytest.ini`, `web/conftest.py`
   - `web/.venv/` (Python 3.14 locally; plan targets Python 3.11 for LXC deploy; not committed); `web/.env` (not committed)
 
 ### Not yet built
-- combsense-web Tasks 5–N: password reset, hive list/detail, deployment
+- combsense-web Tasks 7–N: hive list/detail, deployment
 - Phase 2: IR bee counter (8-pair beam-break array via CD74HC4067 mux)
 - CombSense iOS app BLE/MQTT live-reading integration (separate from history)
 - 3D printed enclosures and sensor gate
