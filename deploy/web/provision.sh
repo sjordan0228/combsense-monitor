@@ -41,6 +41,13 @@ if [ ! -f /etc/combsense-web/env ]; then
   exit 1
 fi
 
+# Plan D gate: DJANGO_CSRF_TRUSTED_ORIGINS is the newest key; its presence proves
+# the operator has migrated the env file per the current env.template.
+grep -q "^DJANGO_CSRF_TRUSTED_ORIGINS=" /etc/combsense-web/env || {
+  echo "!! /etc/combsense-web/env missing Plan D keys — see deploy/web/env.template"
+  exit 1
+}
+
 # Django migrate + collectstatic — load env via bash so values with spaces
 # or metacharacters survive intact (plain `env` has no --file on Debian 12).
 cd "${INSTALL_DIR}/web"
@@ -63,3 +70,31 @@ systemctl enable combsense-web.service
 
 systemctl restart combsense-web.service
 systemctl status combsense-web.service --no-pager
+
+# --- nginx reverse proxy (Plan D) -----------------------------------
+apt-get install -y --no-install-recommends nginx openssl
+
+install -m 644 "${CHECKOUT_DIR}/deploy/web/nginx/combsense-web.conf" \
+        /etc/nginx/sites-available/combsense-web
+ln -snf /etc/nginx/sites-available/combsense-web \
+        /etc/nginx/sites-enabled/combsense-web
+rm -f /etc/nginx/sites-enabled/default
+
+CERT_DIR=/etc/ssl/combsense
+install -d -m 755 "${CERT_DIR}"
+if [ ! -f "${CERT_DIR}/dashboard.crt" ]; then
+  openssl req -x509 -nodes -newkey rsa:2048 \
+    -keyout "${CERT_DIR}/dashboard.key" \
+    -out    "${CERT_DIR}/dashboard.crt" \
+    -days   3650 \
+    -subj   "/CN=dashboard.combsense.com" \
+    -addext "subjectAltName=DNS:dashboard.combsense.com,DNS:combsense-web,IP:192.168.1.61"
+  chmod 600 "${CERT_DIR}/dashboard.key"
+fi
+
+install -d -m 755 /var/www/html
+
+nginx -t
+systemctl enable nginx
+systemctl reload nginx
+# -------------------------------------------------------------------
