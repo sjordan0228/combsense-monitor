@@ -21,6 +21,7 @@ last_updated: 2026-04-20 (combsense-web Plan D live: nginx TLS reverse proxy dep
   - **PostgreSQL 15** on 127.0.0.1:5432 (db: `combsense`, user: `combsense`)
   - **Redis 7** on 127.0.0.1:6379 (for Celery later)
   - **Django (gunicorn)** on 127.0.0.1:8000 via `combsense-web.service`
+  - **nginx 1.22** on :80 / :443 — reverse-proxies gunicorn, serves `/static/` directly, self-signed TLS for `dashboard.combsense.com` (cert at `/etc/ssl/combsense/`)
   - Credentials at `/root/.combsense-web-creds` (mode 600)
   - Systemd drop-in at `/etc/systemd/system/combsense-web.service.d/override.conf` (unprivileged LXC workaround)
 - **Remote:** only `origin` on GitHub (`sjordan0228/combsense-monitor`). Branches: `main` (prod), `dev` (integration).
