@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in — CombSense{% endblock %}
+
+{% block content %}
+<div style="max-width: 360px; margin: 60px auto;">
+  <h1>Sign in</h1>
+
+  {% if form.non_field_errors %}
+    <div role="alert" style="color: #c92a2a; margin-bottom: 12px">
+      {{ form.non_field_errors|join:" " }}
+    </div>
+  {% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <label for="id_username">Email</label>
+    {{ form.username }}
+    {% for err in form.username.errors %}<div style="color:#c92a2a">{{ err }}</div>{% endfor %}
+
+    <label for="id_password" style="margin-top: 12px; display: block;">Password</label>
+    {{ form.password }}
+    {% for err in form.password.errors %}<div style="color:#c92a2a">{{ err }}</div>{% endfor %}
+
+    <button type="submit" style="margin-top: 16px;">Sign in</button>
+  </form>
+</div>
+{% endblock %}
