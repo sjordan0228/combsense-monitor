@@ -1,8 +1,19 @@
 ---
 name: router
 description: Session bootstrap and navigation hub. Read at the start of every session before any task.
-last_updated: 2026-04-19 (sensor-tag-wifi bench bring-up complete)
+last_updated: 2026-04-20 (combsense-tsdb LXC provisioned)
 ---
+
+## Infrastructure
+
+- **Mosquitto broker:** 192.168.1.82:1883 (user `hivesense`)
+- **combsense-tsdb LXC:** 192.168.1.19 — Proxmox LXC 124, NFS-backed, Debian 12
+  - InfluxDB 2.8: `:8086` (org `combsense`, bucket `combsense`, 30d retention)
+  - Grafana 13: `:3000`
+  - Telegraf: installed, not yet configured
+  - Tokens stored on the LXC at `/root/.combsense-tsdb-creds` (mode 600)
+  - Sandboxing drop-ins at `/etc/systemd/system/{grafana-server,telegraf}.service.d/override.conf` — required for unprivileged LXC
+
 
 # Session Bootstrap
 
