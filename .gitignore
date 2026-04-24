@@ -15,6 +15,15 @@ build/
 
 # Superpowers
 .superpowers/
+skills-lock.json
+
+# Editor / agent local state
+.agents/
+.continue/
+.cocoindex_code/
+
+# Disposable debug snippets
+tools/i2c_scanner.cpp
 
 # Ollama output artifacts
 ollama-output-*.md
