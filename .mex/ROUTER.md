@@ -1,7 +1,7 @@
 ---
 name: router
 description: Session bootstrap and navigation hub. Read at the start of every session before any task.
-last_updated: 2026-04-24 (OTA manifest JSON parser added to sensor-tag-wifi; 5 native tests passing)
+last_updated: 2026-04-25 (sensor-tag-wifi HTTP-pull OTA shipped — manifest+sha256 over LAN nginx; pending hardware smoke tests)
 ---
 
 ## Infrastructure
@@ -63,10 +63,11 @@ Read this file fully before doing anything else in this session.
   - Direct MQTT to local Mosquitto, RTC ring buffer for offline resilience
   - BSSID caching in RTC for fast reconnect
   - 18650 + solar powered, 5-min sample cadence by default
-  - Native Unity tests for payload serialization (6 passing, incl. t=0 case) + OTA manifest parser (5 passing)
+  - Native Unity tests: 30 passing across payload (6), OTA manifest parser (9), OTA decision (6), OTA validate-on-boot (4), sha256 streamer (5)
   - Epoch timestamps via NTP sync in `drainBuffer()` — persists across deep sleep via RTC; pre-sync readings emit `t=0` which Telegraf replaces with arrival time
   - NaN temperatures serialize as JSON `null` (not `nan`) so Telegraf/Swift/Postgres parsers accept them
-  - USB-CDC serial console provisioning (WiFi/MQTT creds via `tools/provision_tag.py`)
+  - USB-CDC serial console provisioning (WiFi/MQTT/OTA creds via `tools/provision_tag.py --ota-host ...`)
+  - HTTP-pull OTA on wake (manifest at `http://192.168.1.61/firmware/sensor-tag-wifi/<variant>/manifest.json`, sha256-verified, dual 1.5 MB OTA slots, bootloader auto-rollback if first publish after flash fails). Publish via `deploy/web/publish-firmware.sh <sht31|ds18b20>`. nginx LAN-only allowlist on combsense-web LXC.
 - **TSDB stack** (`combsense-tsdb` LXC, `deploy/tsdb/` for canonical configs)
   - Telegraf MQTT → Influx pipeline, arrival-time stamped, firmware `t` preserved as `sensor_ts` field
   - Downsample tasks: 15m cadence into `combsense_1h`, 6h cadence from `_1h` into `combsense_1d`
@@ -113,6 +114,7 @@ Read this file fully before doing anything else in this session.
 | Working on ESP32 firmware | `firmware/hive-node/` directory |
 | Working on collector firmware | `firmware/collector/` directory |
 | Working on home-yard WiFi variant | `firmware/sensor-tag-wifi/` directory |
+| Sensor-tag-wifi OTA | `firmware/sensor-tag-wifi/src/ota*.cpp` + `deploy/web/publish-firmware.sh` |
 | Shared firmware headers | `firmware/shared/` directory |
 | Making a design decision | `.mex/context/decisions.md` |
 | Writing or reviewing code | `.mex/context/conventions.md` |
