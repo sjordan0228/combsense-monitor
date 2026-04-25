@@ -59,9 +59,11 @@ void Sha256Streamer::update(const uint8_t* data, size_t len) {
 }
 void Sha256Streamer::finalizeToHex(char outHex[65]) {
     uint8_t raw[32];
-    static_cast<Backend*>(impl_)->finalize(raw);
+    Backend* backend = static_cast<Backend*>(impl_);
+    backend->finalize(raw);
     toHex(raw, outHex);
     memcpy(lastHex_, outHex, 65);
+    backend->reset();
 }
 bool Sha256Streamer::matches(const char* expectedHex) {
     if (lastHex_[0] == '\0') return false;
