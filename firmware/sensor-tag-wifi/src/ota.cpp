@@ -2,9 +2,11 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
-#include <esp_http_client.h>
+#include <WiFi.h>
+#include <WiFiClient.h>
 #include <esp_ota_ops.h>
 #include <cstring>
+#include <cstdlib>
 
 #include "config.h"
 #include "ota_decision.h"
@@ -32,71 +34,153 @@ void readOtaHost(char* out, size_t outCap) {
     out[n] = '\0';
 }
 
-bool fetchManifestText(const char* url, char* buf, size_t bufCap, int& outLen) {
-    esp_http_client_config_t cfg = {};
-    cfg.url        = url;
-    cfg.timeout_ms = OTA_HTTP_TIMEOUT_MS;
+struct UrlParts {
+    char     host[64];
+    uint16_t port;
+    char     path[160];
+};
 
-    esp_http_client_handle_t client = esp_http_client_init(&cfg);
-    if (!client) return false;
+/// Parse `http://host[:port]/path` into UrlParts. Bypassing DNS later
+/// requires the host as a separate string we can pass to IPAddress::fromString.
+bool parseHttpUrl(const char* url, UrlParts& out) {
+    if (strncmp(url, "http://", 7) != 0) return false;
+    const char* p     = url + 7;
+    const char* slash = strchr(p, '/');
+    const char* colon = strchr(p, ':');
 
-    bool ok = false;
-    if (esp_http_client_open(client, 0) == ESP_OK) {
-        esp_http_client_fetch_headers(client);
-        int total = 0;
-        while (total < (int)bufCap - 1) {
-            int n = esp_http_client_read(client, buf + total, (int)bufCap - 1 - total);
-            if (n < 0) { total = -1; break; }
-            if (n == 0) break;
-            total += n;
-        }
-        if (total >= 0) {
-            buf[total] = '\0';
-            outLen = total;
-            ok = (esp_http_client_get_status_code(client) == 200);
-        }
-        esp_http_client_close(client);
+    size_t hostLen;
+    if (colon && (!slash || colon < slash)) {
+        hostLen  = static_cast<size_t>(colon - p);
+        out.port = static_cast<uint16_t>(atoi(colon + 1));
+    } else {
+        hostLen  = slash ? static_cast<size_t>(slash - p) : strlen(p);
+        out.port = 80;
     }
-    esp_http_client_cleanup(client);
-    return ok;
+    if (hostLen == 0 || hostLen >= sizeof(out.host)) return false;
+    memcpy(out.host, p, hostLen);
+    out.host[hostLen] = '\0';
+
+    if (slash) {
+        size_t pathLen = strlen(slash);
+        if (pathLen >= sizeof(out.path)) return false;
+        memcpy(out.path, slash, pathLen + 1);
+    } else {
+        out.path[0] = '/'; out.path[1] = '\0';
+    }
+    return true;
+}
+
+/// Open a raw HTTP/1.0 GET via WiFiClient. Bypasses esp-tls/getaddrinfo,
+/// which on ESP32-C6 routes through OpenThread DNS64 and fails for IPv4
+/// literals. PubSubClient uses the same WiFiClient path successfully.
+bool openHttpGet(WiFiClient& client, const UrlParts& u) {
+    IPAddress ip;
+    if (!ip.fromString(u.host)) {
+        if (!WiFi.hostByName(u.host, ip)) return false;
+    }
+    client.setTimeout(OTA_HTTP_TIMEOUT_MS / 1000);
+    if (!client.connect(ip, u.port)) return false;
+    client.printf("GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",
+                  u.path, u.host);
+    return true;
+}
+
+/// Wait for client.available() up to OTA_HTTP_TIMEOUT_MS.
+bool waitForBytes(WiFiClient& client) {
+    uint32_t start = millis();
+    while (!client.available() && client.connected()) {
+        if (millis() - start > OTA_HTTP_TIMEOUT_MS) return false;
+        delay(10);
+    }
+    return client.available();
+}
+
+/// Read and discard HTTP headers; return true on 200 OK status line.
+bool readStatusAndDrainHeaders(WiFiClient& client) {
+    if (!waitForBytes(client)) return false;
+    String status = client.readStringUntil('\n');
+    if (status.indexOf(" 200 ") < 0) {
+        Serial.printf("[OTA] http status: %s\n", status.c_str());
+        return false;
+    }
+    while (client.connected() || client.available()) {
+        String line = client.readStringUntil('\n');
+        line.trim();
+        if (line.isEmpty()) return true;
+    }
+    return false;
+}
+
+bool fetchManifestText(const char* url, char* buf, size_t bufCap, int& outLen) {
+    UrlParts u;
+    if (!parseHttpUrl(url, u)) return false;
+
+    WiFiClient client;
+    if (!openHttpGet(client, u)) return false;
+    if (!readStatusAndDrainHeaders(client)) { client.stop(); return false; }
+
+    int total = 0;
+    while ((client.connected() || client.available()) && total < (int)bufCap - 1) {
+        if (client.available()) {
+            int n = client.read(reinterpret_cast<uint8_t*>(buf + total),
+                                bufCap - 1 - total);
+            if (n > 0) total += n;
+        } else {
+            delay(5);
+        }
+    }
+    client.stop();
+    buf[total] = '\0';
+    outLen     = total;
+    return total > 0;
 }
 
 bool downloadAndStream(const Manifest& m, const esp_partition_t* target) {
+    UrlParts u;
+    if (!parseHttpUrl(m.url, u)) {
+        Serial.printf("[OTA] bad url: %s\n", m.url);
+        return false;
+    }
+
     esp_ota_handle_t handle = 0;
     if (esp_ota_begin(target, OTA_WITH_SEQUENTIAL_WRITES, &handle) != ESP_OK) {
         Serial.println("[OTA] esp_ota_begin failed");
         return false;
     }
 
-    esp_http_client_config_t cfg = {};
-    cfg.url        = m.url;
-    cfg.timeout_ms = OTA_HTTP_TIMEOUT_MS;
-    esp_http_client_handle_t client = esp_http_client_init(&cfg);
-    if (!client) { esp_ota_abort(handle); return false; }
-
-    bool ok = (esp_http_client_open(client, 0) == ESP_OK);
-    if (ok) esp_http_client_fetch_headers(client);
-
-    Sha256Streamer hasher;
-    uint8_t buf[1024];
-    size_t total = 0;
-    while (ok) {
-        int n = esp_http_client_read(client, reinterpret_cast<char*>(buf), sizeof(buf));
-        if (n < 0) { ok = false; break; }
-        if (n == 0) break;
-        if (esp_ota_write(handle, buf, n) != ESP_OK) { ok = false; break; }
-        hasher.update(buf, n);
-        total += n;
-    }
-
-    esp_http_client_close(client);
-    esp_http_client_cleanup(client);
-
-    if (!ok) {
-        Serial.printf("[OTA] download failed at %u bytes\n", (unsigned)total);
+    WiFiClient client;
+    if (!openHttpGet(client, u)) {
+        Serial.println("[OTA] connect failed");
         esp_ota_abort(handle);
         return false;
     }
+    if (!readStatusAndDrainHeaders(client)) {
+        client.stop();
+        esp_ota_abort(handle);
+        return false;
+    }
+
+    Sha256Streamer hasher;
+    uint8_t buf[1024];
+    size_t  total = 0;
+    while (client.connected() || client.available()) {
+        if (client.available()) {
+            int n = client.read(buf, sizeof(buf));
+            if (n <= 0) continue;
+            if (esp_ota_write(handle, buf, n) != ESP_OK) {
+                Serial.printf("[OTA] write failed at %u bytes\n", (unsigned)total);
+                client.stop();
+                esp_ota_abort(handle);
+                return false;
+            }
+            hasher.update(buf, n);
+            total += n;
+        } else {
+            delay(5);
+        }
+    }
+    client.stop();
+
     if (total != m.size) {
         Serial.printf("[OTA] size mismatch got=%u want=%u\n",
                       (unsigned)total, (unsigned)m.size);
