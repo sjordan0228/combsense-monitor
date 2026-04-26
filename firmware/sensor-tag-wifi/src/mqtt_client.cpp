@@ -59,14 +59,12 @@ bool connect(const char* deviceId) {
     return ok;
 }
 
-bool publish(const char* deviceId, const Reading& r) {
+bool publish(const char* deviceId, const Reading& r, int8_t rssi) {
     char topic[96];
     snprintf(topic, sizeof(topic), "%s%s/reading", MQTT_TOPIC_PREFIX, deviceId);
 
     char payload[PAYLOAD_MAX_LEN];
-    // RSSI captured post-connect — wired in next task; placeholder 0 here
-    // makes the call site type-check during the payload-shape rollout.
-    int n = Payload::serialize(deviceId, FIRMWARE_VERSION, 0, r, payload, sizeof(payload));
+    int n = Payload::serialize(deviceId, FIRMWARE_VERSION, rssi, r, payload, sizeof(payload));
     if (n < 0) {
         Serial.println("[MQTT] payload too large");
         return false;

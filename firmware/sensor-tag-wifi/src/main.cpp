@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Preferences.h>
+#include <WiFi.h>
 #include <esp_mac.h>
 #include <esp_sleep.h>
 
@@ -61,11 +62,13 @@ void uploadAndCheckOta(uint8_t batteryPct) {
 
     if (RingBuffer::size() > 0) {
         if (MqttClient::connect(deviceId)) {
+            int8_t sessionRssi = static_cast<int8_t>(WiFi.RSSI());
+            Serial.printf("[MAIN] mqtt connected rssi=%d dBm\n", sessionRssi);
             uint8_t sent = 0;
             while (RingBuffer::size() > 0) {
                 Reading r;
                 if (!RingBuffer::peekOldest(r)) break;
-                if (!MqttClient::publish(deviceId, r)) break;
+                if (!MqttClient::publish(deviceId, r, sessionRssi)) break;
                 RingBuffer::popOldest();
                 sent++;
                 Ota::onPublishSuccess();
@@ -99,7 +102,8 @@ void sampleAndEnqueue() {
         return;
     }
 
-    r.battery_pct = Battery::readPercent();
+    r.vbat_mV     = Battery::readMillivolts();
+    r.battery_pct = Battery::percentFromMillivolts(r.vbat_mV);
     lastBatteryPct = r.battery_pct;
 
     // System clock is set by drainBuffer()'s NTP sync and persists across deep
@@ -110,9 +114,9 @@ void sampleAndEnqueue() {
     r.timestamp = (now > 1700000000) ? static_cast<uint32_t>(now) : 0;
 
     RingBuffer::push(r);
-    Serial.printf("[MAIN] sample t1=%.2f t2=%.2f h1=%.2f h2=%.2f b=%u buffered=%u\n",
-                  r.temp1, r.temp2, r.humidity1, r.humidity2, r.battery_pct,
-                  RingBuffer::size());
+    Serial.printf("[MAIN] sample t1=%.2f t2=%.2f h1=%.2f h2=%.2f vbat=%umV b=%u buffered=%u\n",
+                  r.temp1, r.temp2, r.humidity1, r.humidity2,
+                  r.vbat_mV, r.battery_pct, RingBuffer::size());
 }
 
 }  // anonymous namespace
