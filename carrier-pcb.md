@@ -1,6 +1,6 @@
 # CombSense ESP32-S3-WROOM Hive Node — Carrier PCB Design Spec
 
-**Status:** Design locked, ready for layout
+**Status:** BOM-locked end-to-end (sections 1–5). Ready for KiCad schematic capture.
 **Date:** 2026-04-28
 **Goal:** Sellable kit. JLCPCB-assembled main carrier with bare ESP32-S3-WROOM-1, plug-in scale module, daughtercard for IR sensors, screw-terminal connections for remote sensors. Customer assembly is limited to plugging in modules, soldering wires to screw terminals, and (one place only) soldering a 5-conductor cable to the SPH0645 mic breakout.
 
@@ -39,7 +39,7 @@ The deployed node is **two PCBs** plus off-board sensor modules.
 | MCU module | **ESP32-S3-WROOM-1-N8** (LCSC C2913198) | 8MB flash, no PSRAM. All GPIOs free. Footprint accepts both WROOM-1 (PCB antenna, 25.5×18mm) and WROOM-1U (U.FL, 19.2×18mm) — same pinout, U.FL fits within PCB-antenna outline. **JLCPCB requires an assembly fixture (one-time fee)** for this module. |
 | Antenna | PCB antenna (WROOM-1 default) | WROOM-1U swap available for low-signal installs without re-spin. |
 | Module bulk decoupling | 10µF 0805 X7R 10V (LCSC C15850) | At module 3V3 input pin. |
-| Module HF bypass | 100nF 0603 X7R ×2–3 (LCSC C14663) | Distributed near module pins 2 and 40. |
+| Module HF bypass | 100nF 0603 X7R ×2 (LCSC C14663) | One near module pin 2, one near pin 40 — Espressif reference design. |
 | EN pull-up | 10kΩ 0603 1% (LCSC C25804) | Required by Espressif reference design — module won't boot without. |
 | EN filter cap | 1µF 0603 X7R (LCSC C15849) | RC delay ~10ms with EN pull-up; ensures stable power before reset release. Espressif reference. |
 | BOOT button (IO0) | SMD tact 6×6mm, **TS-1187A-B-A** (LCSC C720477) | Locked specific part — don't let JLCPCB auto-substitute (footprint variance breaks layout). |
@@ -76,11 +76,12 @@ The deployed node is **two PCBs** plus off-board sensor modules.
 |---|---|---|
 | Charge controller | **TI BQ24074RGTR** (LCSC C54313) | QFN-16, 3×3mm. Operating input 4.35–6.45V, abs max 28V. **LCSC stock tight (~1,066 units at scrub time) — order within 30 days of layout finalization.** USB + solar inputs, power-path management, thermal regulation, USB-C DPM. No MPPT — compensated by panel sizing. |
 | BQ24074 — ISET | 1.13kΩ 0603 1% | Sets USB charge current to ~1A (R_ISET = 890/I_chg). Solar caps at panel's 200mA naturally. |
-| BQ24074 — ITERM | 11.3kΩ 0603 1% | ~100mA termination current. |
+| BQ24074 — ITERM | 11kΩ 0603 1% (LCSC C25744) | ~100mA termination current (functionally identical to 11.3kΩ). JLCPCB Basic Parts. |
 | BQ24074 — TS pin | 10kΩ + 10kΩ divider to VREF | Holds TS at 0.5×VREF — IC reads "thermistor OK, charge normally." No NTC needed. Kit-friendly, avoids gluing a thermistor to the 18650. |
-| BQ24074 — PG / CHG | Routed to **GPIO18 (PG)** + **GPIO21 (CHG)**, each with 10kΩ pull-up to 3V3 | Open-drain outputs. Firmware reads for power-source / charging-state visibility. |
+| BQ24074 — PG / CHG | Routed to **GPIO18 (PG)** + **GPIO21 (CHG)** | Open-drain outputs. Firmware reads for power-source / charging-state visibility. |
+| BQ24074 — PG / CHG pull-ups ×2 | 10kΩ 0603 1% (LCSC C25804) | One each on PG and CHG lines to 3V3. Required for open-drain output sensing. |
 | BQ24074 — DPM | Hardwired disable | USB-C handles current limiting upstream. |
-| BQ24074 — IN cap | 4.7µF ceramic 25V X7R 0805 | 25V rating for solar surge margin. |
+| BQ24074 — IN cap | 10µF 25V X7R 0805 (LCSC C440198) | 25V rating for solar surge margin. Consolidated to 10µF (was 4.7µF) — same value as module bulk cap, one fewer unique BOM line. |
 | BQ24074 — SYS cap | 22µF ceramic 10V X7R 0805 | Output bulk per datasheet. |
 | BQ24074 — BAT cap | 10µF ceramic 10V X7R 0805 | Battery-line cap. |
 | Solar input fuse | Bourns MF-MSMF050-2 polyfuse (LCSC C181432) | 0.5A hold, 1A trip. Between solar screw terminal and P-FET. |
@@ -118,7 +119,7 @@ The deployed node is **two PCBs** plus off-board sensor modules.
 | microSD socket | TF-01A push-pull (LCSC C91139) — **footprint reserved, unpopulated v1** | JLCPCB skips placement when not in assembly BOM. SPI bus on GPIO10–13 (IO_MUX fast-path). |
 | Status LED (bicolor R/G) | 0603 bicolor dual-LED, common anode — KT-0603SURKCGKC or equivalent (LCSC C2837) | Common anode → 3V3. Cathodes → GPIO47 (R) / GPIO48 (G) through 470Ω current-limit resistors. **Active LOW.** |
 | LED current-limit resistors ×2 | 470Ω 0603 1% (LCSC C23179) | One per cathode. ~5mA per color at 3V3. |
-| ESD protection on screw terminals ×3 | ESD9B5.0ST5G (LCSC C84669) | SOD-923. Place near solar, mic data lines, and DS18B20 screw terminals. IR ribbon ESD handled at daughtercard end (not carrier). |
+| ESD protection on signal lines ×4 | ESD9B5.0ST5G (LCSC C84669) | SOD-923. 3× on mic data lines (BCLK, LRCL, DOUT) + 1× on DS18B20 DATA. **Skip solar input** — SMBJ24CA TVS clamp in the power chain already covers it. IR ribbon ESD is handled at the daughtercard end, not on the carrier. |
 | 18650 battery holder | **Keystone 1042 PCB-mount** (LCSC C964175) | Premium choice for kit reliability — robust spring contacts, solid retention. ~$0.50 premium over AliExpress generic; worth it for non-maker users. |
 
 **Section cost:** ~$1.65/board.
@@ -158,6 +159,35 @@ Both are v2 considerations — v1 sticks with BQ24074 + 5V FellDen panel(s).
 | Board dimensions | **80 × 60mm** |
 | Mounting holes | 4× M3 (3.2mm dia) at corners, 3mm inset from each edge |
 | Layer stackup | 2-layer (default) — bump to 4-layer only if layout density requires it |
+
+### 2.6 BOM summary — final lock
+
+End-to-end consolidation across BOM sections 1–5.
+
+| Category | Unique parts |
+|---|---|
+| Resistors (0603 1%) | **9 values:** 0Ω, 470Ω, 1.13kΩ, 4.7kΩ, 5.1kΩ, 10kΩ, 11kΩ, 100kΩ, 1MΩ |
+| Capacitors (ceramic X7R + 1× aluminum electrolytic) | **6 values:** 10nF, 100nF, 1µF, 10µF (10V and 25V on same row), 22µF, 47µF aluminum |
+| Active discretes | **7 types:** MMBT3904, AO3401A, FS8205A, BZT52C12, ESD9B5.0, SMBJ24CA, KT-0603 bicolor LED |
+| ICs | **6 types:** ESP32-S3-WROOM-1-N8, BQ24074, TPS73633, DW01A, CH340C, USBLC6 |
+| Connectors / mechanical | **10 types:** USB-C 6-pin, KF128 ×3 sizes (2/3/5-pos), 4-pin female right-angle, 4-pin male vertical, 2×6 box header, microSD (unpopulated v1), Keystone 1042 18650 holder, polyfuse, tact switch |
+| **Total unique part types** | **38** |
+| **Total placements (populated v1)** | **~70 per board** |
+
+**100nF placement count board-wide: 5** (2× module HF bypass + 2× CH340C [VCC + V3] + 1× VBUS HF). Useful for verifying the assembly BOM during fab review.
+
+**Cost projection at qty 20 (Standard top-side PCBA):**
+
+| Item | Cost/board |
+|---|---|
+| Components | ~$7.07 |
+| PCBA assembly (placement + Extended-Parts handling, amortized over 20) | ~$3.20 |
+| Bare PCB (80×60mm, 2-layer, HASL) | ~$0.50 |
+| **Total** | **~$10.77 per fully-assembled board** |
+
+Comfortably under the $25 target with margin.
+
+**Status: BOM-locked. Ready for KiCad schematic capture.**
 
 ---
 
