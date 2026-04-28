@@ -28,6 +28,7 @@ Connection: 12-conductor Dupont jumper bundle, M-M, 30–60cm long. Conductor or
 | # | Part | Qty | Source | ~Cost |
 |---|---|---|---|---|
 | 1 | **ESP32-S3-DevKitC-1-N8** dev board (no PSRAM, all GPIOs broken out) | 1 | [Adafruit](https://www.adafruit.com/product/5312) / Mouser / Digikey | $15 |
+| 1-alt | *or* **Freenove ESP32-S3-WROOM Board** (typical Amazon SKU is N16R8 with octal PSRAM — already-owned-hardware path; uses a remapped pinmap, see §10) | (already owned) | Amazon | — |
 | 2 | **TP4056 + DW01 protection** charger module (USB-C variant preferred) | 1 | [Amazon](https://www.amazon.com/s?k=TP4056+USB-C+protection) | $2 (5-pack ~$8) |
 | 3 | **18650 cell** Panasonic NCR18650B 3500mAh (or equivalent) | 1 | Amazon, Aliexpress | $7 |
 | 4 | **18650 PCB-mount holder** Keystone-style (with PCB pads or pre-soldered leads) | 1 | Amazon | $3 |
@@ -233,3 +234,64 @@ This separation lets you ship a working prototype **today** and a polished kit *
 - **TP4056 + DW01 reference** (typical Amazon module schematic — search "TP4056 DW01 schematic")
 - **Adafruit ADA3421 SPH0645 guide** — I²S wiring + library
 - **Adafruit ADA2167** — IR break-beam pair datasheet (verify before IR breadboard build)
+
+---
+
+## 10. Alternative dev board: Freenove ESP32-S3-WROOM (already-owned)
+
+The default path uses ESP32-S3-DevKitC-1-N8 (no PSRAM) so the GPIO pinmap is identical to the locked PCB design. If you already own a **Freenove ESP32-S3-WROOM Board** — almost always the **N16R8 variant (16MB flash + 8MB octal PSRAM)** — the IR pinmap has to change because **GPIO33–37 are internally claimed by the octal PSRAM** on R8 modules.
+
+Verify your variant before continuing. Either:
+- Look at the silkscreen on the WROOM module — it'll read `WROOM-1-N16R8`, `N8R8`, or `N8`. Plain `N8` (no R) means no PSRAM and the default DevKitC pinmap works as-is.
+- *Or* run `esptool.py --chip esp32s3 chip_id` and check whether PSRAM is detected.
+
+Assuming N16R8 (the typical case), we move the 8 IR detectors to a different contiguous block. Conveniently, **GPIO11–18 are 8 contiguous unblocked pins** on N16R8, and the IR emitter enable shifts to GPIO21.
+
+### Freenove (N16R8) pinmap
+
+| GPIO | Function | Notes |
+|---|---|---|
+| 0 | BOOT button (built-in) | Strapping. |
+| 1 | Battery voltage monitor | ADC1_CH0. 1MΩ + 1MΩ + 10nF. |
+| 2 | HX711 DT | (was GPIO16 on DevKitC pinmap) |
+| 3 | HX711 SCK | (was GPIO17). GPIO3 is a JTAG strap — relevant only at boot, output use is fine. |
+| 4 | I²S BCLK | unchanged |
+| 5 | I²S LRCL/WS | unchanged |
+| 6 | I²S DOUT | unchanged |
+| 7 | DS18B20 1-Wire DATA | (was GPIO15). + 4.7kΩ pull-up to 3V3. |
+| 8 | I²C SDA | unchanged |
+| 9 | I²C SCL | unchanged |
+| 10 | (spare) | Was microSD CS — SD is unpopulated on breadboard so reuse here is fine. |
+| **11** | **IR detector #1** | **Block GPIO11–18 reserved for 8 IR detectors, contiguous.** |
+| **12** | IR detector #2 | |
+| **13** | IR detector #3 | |
+| **14** | IR detector #4 | |
+| **15** | IR detector #5 | |
+| **16** | IR detector #6 | |
+| **17** | IR detector #7 | |
+| **18** | IR detector #8 | |
+| 19, 20 | Native USB D−/D+ | Reserved by Freenove's USB port. Don't reuse. |
+| **21** | **IR emitter enable** | (was GPIO41). MOSFET gate on the IR breadboard. |
+| 33–37 | **BLOCKED — octal PSRAM** | Unavailable for general I/O. |
+| 38–42 | (spare) | 5 free GPIOs for expansion. |
+| 43, 44 | UART0 (CP2102 USB-UART) | Reserved by Freenove's flashing path. |
+| 45, 46 | (strapping) | Leave floating. |
+| 47 | Status LED red | unchanged |
+| 48 | Status LED green | unchanged |
+
+**Spare GPIOs on Freenove:** 10, 38, 39, 40, 41, 42 — 6 free.
+
+### What changes about the build
+
+1. **The IR ribbon-cable wiring on the main-board end** lands on GPIO11–18 + GPIO21 instead of GPIO33–40 + GPIO41. The ribbon-cable conductor *order* stays the same — wire #1 is still IR detector #1 — only where it plugs in on the main side changes. See [breadboard-ir.md §3](breadboard-ir.md) which tracks both options in one table.
+2. **HX711 + DS18B20 also shift** to lower GPIOs (2, 3, 7) since 15–17 are now eaten by IR detectors.
+3. **Firmware** needs a different pin assignment. When the hive-node firmware is written, make the pinmap a build-time configuration (e.g., a `BOARD_FREENOVE_S3_N16R8` macro) so the same firmware compiles for either dev board. The two pinmaps should be defined side-by-side in a single header.
+4. **microSD bus** doesn't get the IO_MUX SPI2 fast-path on this layout because GPIO10–13 are split (10 is spare, 11–13 are IR detectors). This only matters when the microSD socket is populated, which is a v2 concern anyway. If/when SD is needed on Freenove, route through the GPIO matrix at reduced clock rate (~40MHz vs 80MHz).
+
+### Cost / sourcing
+
+Zero extra cost — you're using boards you already own. The rest of the parts list (TP4056, sensors, breadboards, etc.) is unchanged.
+
+### Recommendation
+
+Use one of your Freenove boards for the **first prototype** so you can start building today. If you ever need a second unit (test rig + deployed unit, or comparing two builds), pick up the DevKitC-N8 then so you also have hardware-pinmap parity with the eventual PCB.

@@ -36,22 +36,24 @@ This isolates the entrance hardware from the brain — same architectural patter
 
 ## 3. Cable home-run pinout
 
-12 conductors. **Order must match GPIO order on the main breadboard side** so firmware doesn't need a remap.
+12 conductors. The ribbon's conductor **order is fixed** — wire #1 is always IR detector #1. The actual GPIO each wire plugs into on the main side depends on which dev board is used (see [breadboard-main.md](breadboard-main.md) for both pinmaps).
 
-| Wire # | Signal | Main board pin |
-|---|---|---|
-| 1 | Detector #1 signal | GPIO33 |
-| 2 | Detector #2 signal | GPIO34 |
-| 3 | Detector #3 signal | GPIO35 |
-| 4 | Detector #4 signal | GPIO36 |
-| 5 | Detector #5 signal | GPIO37 |
-| 6 | Detector #6 signal | GPIO38 |
-| 7 | Detector #7 signal | GPIO39 |
-| 8 | Detector #8 signal | GPIO40 |
-| 9 | Emitter enable (MOSFET gate drive) | GPIO41 |
-| 10 | 3V3 (always-on) | 3V3 rail |
-| 11 | GND | GND rail |
-| 12 | Spare | (unused) |
+| Wire # | Signal | DevKitC-N8 GPIO | Freenove-N16R8 GPIO |
+|---|---|---|---|
+| 1 | Detector #1 signal | GPIO33 | GPIO11 |
+| 2 | Detector #2 signal | GPIO34 | GPIO12 |
+| 3 | Detector #3 signal | GPIO35 | GPIO13 |
+| 4 | Detector #4 signal | GPIO36 | GPIO14 |
+| 5 | Detector #5 signal | GPIO37 | GPIO15 |
+| 6 | Detector #6 signal | GPIO38 | GPIO16 |
+| 7 | Detector #7 signal | GPIO39 | GPIO17 |
+| 8 | Detector #8 signal | GPIO40 | GPIO18 |
+| 9 | Emitter enable (MOSFET gate) | GPIO41 | GPIO21 |
+| 10 | 3V3 (always-on) | 3V3 rail | 3V3 rail |
+| 11 | GND | GND rail | GND rail |
+| 12 | Spare | (unused) | (unused) |
+
+**Why the difference:** the Freenove board uses the WROOM-1-N16R8 module with octal PSRAM, which internally claims GPIO33–37. The IR detector block has to move down to GPIO11–18 (8 contiguous pins on that variant).
 
 **Practical:** label both ends of the bundle with masking tape and a Sharpie. Mismatch on this one cable is the most likely build error.
 
