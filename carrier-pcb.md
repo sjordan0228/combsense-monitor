@@ -1,7 +1,7 @@
 # CombSense ESP32-S3-WROOM Hive Node — Carrier PCB Design Spec
 
 **Status:** Design locked, ready for layout
-**Date:** 2026-04-27
+**Date:** 2026-04-28
 **Goal:** Sellable kit. JLCPCB-assembled main carrier with bare ESP32-S3-WROOM-1, plug-in scale module, daughtercard for IR sensors, screw-terminal connections for remote sensors. Customer assembly is limited to plugging in modules, soldering wires to screw terminals, and (one place only) soldering a 5-conductor cable to the SPH0645 mic breakout.
 
 ---
@@ -42,17 +42,36 @@ The deployed node is **two PCBs** plus off-board sensor modules.
 | Buttons | 2× SMD tact: BOOT (IO0) + RESET (EN) | Manual bootloader entry if OTA bricks itself. |
 | Status LED | SMD bicolor red/green | One footprint, two GPIOs. Firmware drives boot/associate/sleep/OTA states. |
 
-### Power chain
+### Power chain — BOM-locked
 
 | Item | Decision | Notes |
 |---|---|---|
-| Charge controller | **TI BQ24074** | USB + solar inputs, power-path management, thermal regulation, USB-C DPM. **Operating input: 4.35–6.45V. Absolute max: 28V.** No MPPT — compensated by panel sizing. |
-| Battery protection | **DW01A + FS8205A** | Over-discharge/over-charge/over-current cutoff. Sits between holder and rest of circuit. Non-negotiable for a kit. |
-| 3.3V rail | **TI TPS73633 LDO** | 400mA, ~1µA Iq, fast transient. + 22µF output cap, 100nF bypass, 100µF input bulk. |
-| Battery voltage monitor | **1MΩ + 1MΩ divider + 10nF cap to GND at ADC tap** → ADC1 GPIO | ~2.1µA continuous (10× lower than 100k/100k). 10nF cap acts as anti-alias filter against ADC sample noise. No FET-gating needed. |
-| Solar reverse-polarity | **"Ideal diode" P-MOSFET** — Drain on Solar+, Source on BQ24074 VIN, Gate via 100kΩ pulldown to GND, Zener clamp (e.g., 12V) gate-to-GND | Body-diode turns on first → V_GS negative → FET enhances → ~milliohm R_DS(on). Zener protects V_GS(max) against high-Voc panels. FET must be rated for V_DS ≥ panel Voc + margin (12V FET fine for ≤7V panel). |
-| ESD on USB | USBLC6-2SC6 TVS array | D+/D-/VBUS. |
+| Charge controller | **TI BQ24074RGTR** (LCSC C54313) | QFN-16, 3×3mm. Operating input 4.35–6.45V, abs max 28V. **LCSC stock tight (~1,066 units at scrub time) — order within 30 days of layout finalization.** USB + solar inputs, power-path management, thermal regulation, USB-C DPM. No MPPT — compensated by panel sizing. |
+| BQ24074 — ISET | 1.13kΩ 0603 1% | Sets USB charge current to ~1A (R_ISET = 890/I_chg). Solar caps at panel's 200mA naturally. |
+| BQ24074 — ITERM | 11.3kΩ 0603 1% | ~100mA termination current. |
+| BQ24074 — TS pin | 10kΩ + 10kΩ divider to VREF | Holds TS at 0.5×VREF — IC reads "thermistor OK, charge normally." No NTC needed. Kit-friendly, avoids gluing a thermistor to the 18650. |
+| BQ24074 — PG / CHG | Routed to **GPIO18 (PG)** + **GPIO21 (CHG)**, each with 10kΩ pull-up to 3V3 | Open-drain outputs. Firmware reads for power-source / charging-state visibility. |
+| BQ24074 — DPM | Hardwired disable | USB-C handles current limiting upstream. |
+| BQ24074 — IN cap | 4.7µF ceramic 25V X7R 0805 | 25V rating for solar surge margin. |
+| BQ24074 — SYS cap | 22µF ceramic 10V X7R 0805 | Output bulk per datasheet. |
+| BQ24074 — BAT cap | 10µF ceramic 10V X7R 0805 | Battery-line cap. |
+| Solar input fuse | Bourns MF-MSMF050-2 polyfuse (LCSC C181432) | 0.5A hold, 1A trip. Between solar screw terminal and P-FET. |
+| Solar input surge cap | 47µF aluminum electrolytic | At screw terminal, before polyfuse. Cheap insurance for outdoor wiring. |
+| Solar reverse-polarity FET | **AO3401A** (LCSC C15127) | -30V V_DS, 60mΩ R_DS(on), SOT-23. Drain on Solar+, Source on BQ24074 VIN. |
+| P-FET gate Zener | BZT52C12 (LCSC C8062) | 12V Zener, gate-to-source clamp. SOD-123. Protects V_GS(max) against high-Voc panels. |
+| P-FET gate pulldown | 100kΩ 0603 1% | Gate-to-source. |
+| Solar TVS clamp | SMBJ24CA (LCSC C8978) | Bidirectional 24V TVS, post-FET to GND. SMB package. |
+| Battery protection IC | **DW01A** (LCSC C8396) | SOT-23-6. JLCPCB Basic Parts. Over-discharge/over-charge/over-current cutoff. |
+| Battery protection MOSFETs | **FS8205A** (LCSC C32254) | SOT-23-6 dual N-channel. JLCPCB Basic Parts. Pairs with DW01A per standard reference design. |
+| 3.3V LDO | **TI TPS73633DBVR** (LCSC C28038) | SOT-23-5, fixed 3.3V, 1µA Iq, 400mA. |
+| TPS73633 — input cap | 1µF ceramic 10V X7R 0603 | Per datasheet. |
+| TPS73633 — output cap | 22µF ceramic 10V X7R 0805 | **Stability-critical — must be ceramic, 2.2µF–47µF range. Don't substitute polymer.** |
+| TPS73633 — NR cap | 10nF ceramic 0603 | Optional noise-reduction pin cap. Populate. |
+| Battery voltage monitor | 1MΩ + 1MΩ divider + 10nF cap to GND at ADC tap → **GPIO1** (ADC1_CH0) | ~2.1µA continuous. 10nF anti-alias filter against ADC sample noise. No FET-gating needed. |
+| ESD on USB | USBLC6-2SC6 TVS array | D+/D−/VBUS. |
 | ESD on screw terminals | ESD9B/ESD9R on each external input | Cheap insurance for outdoor connectors. |
+
+**Power chain BOM cost:** ~$1.30/board at qty 20.
 
 ### Sensor terminations
 
@@ -128,43 +147,69 @@ The "anything physically remote → daughtercard with one cable home-run" patter
 
 ---
 
-## 5. Pinout — defer to layout
+## 5. GPIO pinmap — locked
 
-GPIO assignments are not pre-locked; the layout pass picks pins for routing convenience. Constraints to honor:
+| GPIO | Function | Notes |
+|---|---|---|
+| 0 | BOOT button (physical only) | Strapping — must be HIGH at boot. Don't reuse. |
+| 1 | Battery voltage monitor | ADC1_CH0. 1M/1M divider + 10nF cap to GND at ADC tap. |
+| 4 | I²S BCLK (mic) | Group with 5/6. |
+| 5 | I²S LRCL/WS (mic) | |
+| 6 | I²S DOUT (mic) | |
+| 8 | I²C SDA | Arduino default. Call `Wire.begin(8, 9)` explicitly. |
+| 9 | I²C SCL | |
+| 10 | microSD CS (FSPICS0) | IO_MUX SPI2 fast-path. Was ADC1_CH9 — gives up that channel. |
+| 11 | microSD MOSI (FSPID) | IO_MUX SPI2 fast-path. |
+| 12 | microSD SCK (FSPICLK) | IO_MUX SPI2 fast-path. |
+| 13 | microSD MISO (FSPIQ) | IO_MUX SPI2 fast-path. |
+| 15 | DS18B20 1-Wire DATA | + 4.7kΩ pull-up to 3V3 on carrier. |
+| 16 | HX711 DT (input) | |
+| 17 | HX711 SCK (output) | |
+| 18 | BQ24074 PG (power good) | Open-drain input. 10kΩ pull-up to 3V3. |
+| 21 | BQ24074 CHG (charging) | Open-drain input. 10kΩ pull-up to 3V3. |
+| 33 | IR detector #1 | **GPIO33–40 reserved for 8 IR detectors, contiguous.** Ribbon conductor order matches GPIO order. |
+| 34 | IR detector #2 | INPUT_PULLUP; phototransistor pulls LOW when beam broken. |
+| 35 | IR detector #3 | |
+| 36 | IR detector #4 | |
+| 37 | IR detector #5 | |
+| 38 | IR detector #6 | |
+| 39 | IR detector #7 | |
+| 40 | IR detector #8 | |
+| 41 | IR emitter enable | Output → P-MOSFET gate on daughtercard. |
+| 43 | UART0 TX (CH340) | Reserved for bootloader path. Don't reuse. |
+| 44 | UART0 RX (CH340) | Reserved for bootloader path. Don't reuse. |
+| 45 | (strapping) | VDD_SPI voltage select at boot. Leave floating. |
+| 46 | (strapping) | ROM UART message control at boot. Leave floating. |
+| 47 | Status LED red | Active low. |
+| 48 | Status LED green | Active low. |
 
-- **Battery voltage monitor**: must be on ADC1 (GPIO1–10). ADC2 has WiFi conflicts.
-- **UART0** (GPIO43 TX / GPIO44 RX): reserved for CH340C bootloader path. Don't reuse for app-level UART.
-- **Strapping pins**: GPIO0, GPIO3, GPIO45, GPIO46 — avoid for outputs that must be high/low at boot.
-- **USB pins** (GPIO19 / GPIO20): free for general I/O since flashing goes through CH340, not native USB-CDC.
-- **microSD SPI bus**: reserve 4 contiguous, routable GPIOs even though socket is unpopulated v1 (so a future populate-only build doesn't need a board respin).
+**Spare GPIOs:** 2, 3, 7, 14, 19, 20, 42 (7 free; GPIO3 has JTAG-strap caveat — avoid for general use).
 
-Peripheral pin budget (approximate count of GPIOs needed):
+**Constraints honored:**
+- ADC1 used for battery monitor (GPIO1).
+- UART0 (GPIO43/44) reserved for CH340C.
+- Strapping pins (GPIO0/3/45/46) handled correctly.
+- microSD on IO_MUX SPI2 fast-path (GPIO10–13) → genuine 80MHz SD speed when populated.
+- 8 IR detectors contiguous on GPIO33–40 — matches WROOM-1's high-numbered edge for clean ribbon-cable routing.
+- USB pins (GPIO19/20) freed because flashing goes through CH340, not native USB-CDC.
 
-| Peripheral | GPIOs |
-|---|---|
-| I²S mic (BCLK, LRCL, DOUT) | 3 |
-| HX711 (DT, SCK) | 2 |
-| DS18B20 (1-Wire DATA) | 1 |
-| 8× IR detectors | 8 |
-| IR emitter enable | 1 |
-| Status LED (bicolor) | 2 |
-| Battery monitor (ADC) | 1 |
-| microSD SPI (MISO/MOSI/SCK/CS) | 4 |
-| **Total** | **22** |
-
-WROOM-1-N8 has ~28–30 freely usable GPIOs after strapping/USB/UART carve-outs. Comfortable margin.
+Total assigned: 26 GPIOs (24 peripherals + 2 BQ24074 status). 7 spares for future expansion.
 
 ---
 
 ## 6. Open items before fab
 
-1. **Verify HX711 module pinout** by photographing the kit's actual board (B07B4DNJ2L). Lock the silkscreen + female header pinout to that exact module so buyers don't plug it in backwards. Currently assumed `GND / DT / SCK / VCC` from the listing photo.
-2. **Confirm Adafruit IR break-beam wire count + connector** (bare 3-wire vs 4-wire vs JST). Drives daughtercard terminal block selection.
-3. **Lock GPIO assignments** during the layout pass, honoring the constraints in §5.
-4. **Enclosure** — 3D-printed weatherproof box, target ~90 × 70 × 35mm to fit carrier + 18650 + headroom for HX711 module. Specify mounting hole pattern matching §2 (4× M3 at corners, 3mm inset).
-5. **WROOM-1 antenna keep-out** — apply Espressif's recommended keep-out region around the module's antenna so the PCB-antenna variant works. Same footprint also fits WROOM-1U.
-6. **Pick a specific 5V or 6V solar panel SKU** for the kit recommendation (Amazon link + Voc verified ≤7V) per §2.5. Most-common-fail mode if buyers free-source from "12V solar" listings.
-7. **Spec the P-FET part** for the reverse-polarity circuit: V_DS ≥ 20V (margin over panel Voc), V_GS(th) low enough to fully enhance with body-diode forward drop, low R_DS(on). Candidates: AO3401, SI2301, DMP3098L. Plus 100kΩ gate pulldown + 12V Zener clamp.
+1. **Enclosure** — 3D-printed weatherproof box, target ~90 × 70 × 35mm to fit carrier + 18650 + headroom for HX711 module. Specify mounting hole pattern matching §2 (4× M3 at corners, 3mm inset).
+2. **WROOM-1 antenna keep-out** — apply Espressif's recommended keep-out region around the module's antenna so the PCB-antenna variant works. Same footprint also fits WROOM-1U.
+3. **BQ24074 stock watch** — order BQ24074RGTR (LCSC C54313) within 30 days of layout finalization. Stock was tight at scrub time (~1,066 units globally on LCSC). Drop-in alternates if stock dries up: BQ24075 (same family, near-identical). Otherwise re-spin to a different charger family.
+
+### Closed (BOM-locked or otherwise resolved)
+
+- ~~HX711 module pinout~~ — verified GND / DT / SCK / VCC from kit photo.
+- ~~IR break-beam wire count~~ — 5 wires per pair (emitter R/B + detector R/B/W). All bare-tinned.
+- ~~GPIO assignment~~ — locked in §5.
+- ~~Solar panel SKU~~ — FellDen 5V 200mA 5-pack (Amazon B0BML3PR4Z). See §2.5.
+- ~~Solar reverse-polarity P-FET~~ — AO3401A (LCSC C15127) per §2 power-chain table.
 
 ---
 
