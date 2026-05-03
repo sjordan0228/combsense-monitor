@@ -231,6 +231,17 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
     Serial.printf("[CONFIG] applied=%u rejected=%u\n",
                   applied.numApplied, parsed.num_rejected);
 
+    // §3.2: re-publish capabilities after any successful config apply so the
+    // backend sees the updated feat_* state immediately.  PR-2 will gate this
+    // on "did any feat_* key actually change"; for PR-1 it's unconditional and
+    // harmless (capabilities payload is identical when no feat_* keys changed).
+    if (applied.numApplied > 0) {
+        Serial.println("[CONFIG] re-publishing capabilities post-apply");
+        if (!Capabilities::publish(rtcLastBootEpoch)) {
+            Serial.println("[CAP] re-publish after config failed");
+        }
+    }
+
     // Publish ack to `combsense/hive/<id>/config/ack`.
     char ackTopic[96];
     snprintf(ackTopic, sizeof(ackTopic), "%s%s/config/ack",
