@@ -148,7 +148,7 @@ void cmdTare() {
         publishStatusEvent(buf);
         return;
     }
-    int64_t off = tareFromMean(samples, HX711_TARE_SAMPLE_COUNT);
+    int64_t off = tareFromMean(samples, HX711_TARE_SAMPLE_COUNT, 2);
     writeOffsetToNvs(off);
 
     char buf[160];
@@ -165,7 +165,7 @@ void cmdCalibrate(double known_kg) {
         publishStatusEvent(buf);
         return;
     }
-    double sf = scaleFactorFromMean(samples, HX711_TARE_SAMPLE_COUNT, weight_off_, known_kg);
+    double sf = scaleFactorFromMean(samples, HX711_TARE_SAMPLE_COUNT, weight_off_, known_kg, 2);
     if (std::fabs(sf) < HX711_CALIBRATE_MIN_FACTOR) {
         char buf[200];
         char detail[64];

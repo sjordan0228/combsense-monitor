@@ -84,17 +84,39 @@ void test_apply_calibration_negative_load() {
 }
 
 void test_tare_from_mean() {
-    // mean of [1000, 1010, 990, 1005, 995] = 1000
+    // mean of [1000, 1010, 990, 1005, 995] = 1000; trim=0 (no trimming)
     int32_t samples[] = {1000, 1010, 990, 1005, 995};
-    int64_t off = tareFromMean(samples, 5);
+    int64_t off = tareFromMean(samples, 5, 0);
     TEST_ASSERT_EQUAL_INT64(1000, off);
 }
 
 void test_scale_factor_from_mean() {
-    // raw=10345, off=345, known_kg=10 → scale = (10345-345)/10 = 1000.0
+    // raw=10345, off=345, known_kg=10 → scale = (10345-345)/10 = 1000.0; trim=0
     int32_t samples[] = {10345};
-    double sf = scaleFactorFromMean(samples, 1, 345, 10.0);
+    double sf = scaleFactorFromMean(samples, 1, 345, 10.0, 0);
     TEST_ASSERT_EQUAL_DOUBLE(1000.0, sf);
+}
+
+void test_tare_with_outlier_rejection() {
+    // 16 samples mostly at 1000, two high spikes: trimmed mean should still report ~1000
+    int32_t samples[16];
+    for (int i = 0; i < 16; i++) samples[i] = 1000;
+    samples[0]  = 10000;  // spike
+    samples[15] = 50000;  // spike
+    // trim=2: drops 2 lowest and 2 highest → averages the 12 interior samples (all ~1000)
+    int64_t off = tareFromMean(samples, 16, 2);
+    TEST_ASSERT_EQUAL_INT64(1000, off);
+}
+
+void test_scale_factor_with_outlier_rejection() {
+    // 16 samples: 14 at raw=10345, 2 spikes; off=345, known_kg=10
+    int32_t samples[16];
+    for (int i = 0; i < 16; i++) samples[i] = 10345;
+    samples[0]  = 100000;  // high spike
+    samples[1]  = 500;     // low spike
+    double sf = scaleFactorFromMean(samples, 16, 345, 10.0, 2);
+    // trimmed mean of interior 12 = 10345; sf = (10345-345)/10 = 1000.0
+    TEST_ASSERT_DOUBLE_WITHIN(0.01, 1000.0, sf);
 }
 
 void test_error_pct_basic() {
@@ -157,6 +179,8 @@ int main(int, char**) {
     RUN_TEST(test_apply_calibration_negative_load);
     RUN_TEST(test_tare_from_mean);
     RUN_TEST(test_scale_factor_from_mean);
+    RUN_TEST(test_tare_with_outlier_rejection);
+    RUN_TEST(test_scale_factor_with_outlier_rejection);
     RUN_TEST(test_error_pct_basic);
     RUN_TEST(test_error_pct_zero_expected_returns_neg_one);
     RUN_TEST(test_keep_alive_future_is_valid);

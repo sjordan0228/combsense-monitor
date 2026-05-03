@@ -44,18 +44,49 @@ double applyCalibration(int32_t raw, int64_t off, double scale_factor) {
     return static_cast<double>(static_cast<int64_t>(raw) - off) / scale_factor;
 }
 
-int64_t tareFromMean(const int32_t* samples, uint8_t n) {
+int64_t tareFromMean(const int32_t* samples, uint8_t n, uint8_t trim) {
     if (n == 0) return 0;
+    // Clamp trim so at least 1 sample remains
+    uint8_t drop = 2 * trim;
+    if (drop >= n) drop = 0;
+
+    // Sort a copy
+    int32_t sorted[HX711_TARE_SAMPLE_COUNT > HX711_VERIFY_SAMPLE_COUNT
+                   ? HX711_TARE_SAMPLE_COUNT : HX711_VERIFY_SAMPLE_COUNT];
+    uint8_t sz = n < sizeof(sorted) / sizeof(sorted[0]) ? n : sizeof(sorted) / sizeof(sorted[0]);
+    for (uint8_t i = 0; i < sz; i++) sorted[i] = samples[i];
+    std::sort(sorted, sorted + sz);
+
+    uint8_t lo = trim < sz ? trim : 0;
+    uint8_t hi = (sz > trim) ? (sz - trim) : sz;
+    uint8_t used = hi - lo;
+    if (used == 0) { used = sz; lo = 0; hi = sz; }
+
     int64_t sum = 0;
-    for (uint8_t i = 0; i < n; i++) sum += samples[i];
-    return sum / n;
+    for (uint8_t i = lo; i < hi; i++) sum += sorted[i];
+    return sum / used;
 }
 
-double scaleFactorFromMean(const int32_t* samples, uint8_t n, int64_t off, double known_kg) {
+double scaleFactorFromMean(const int32_t* samples, uint8_t n, int64_t off, double known_kg, uint8_t trim) {
     if (n == 0 || known_kg == 0.0) return 0.0;
+    // Clamp trim so at least 1 sample remains
+    uint8_t drop = 2 * trim;
+    if (drop >= n) drop = 0;
+
+    int32_t sorted[HX711_TARE_SAMPLE_COUNT > HX711_VERIFY_SAMPLE_COUNT
+                   ? HX711_TARE_SAMPLE_COUNT : HX711_VERIFY_SAMPLE_COUNT];
+    uint8_t sz = n < sizeof(sorted) / sizeof(sorted[0]) ? n : sizeof(sorted) / sizeof(sorted[0]);
+    for (uint8_t i = 0; i < sz; i++) sorted[i] = samples[i];
+    std::sort(sorted, sorted + sz);
+
+    uint8_t lo = trim < sz ? trim : 0;
+    uint8_t hi = (sz > trim) ? (sz - trim) : sz;
+    uint8_t used = hi - lo;
+    if (used == 0) { used = sz; lo = 0; hi = sz; }
+
     int64_t sum = 0;
-    for (uint8_t i = 0; i < n; i++) sum += samples[i];
-    double mean = static_cast<double>(sum) / n;
+    for (uint8_t i = lo; i < hi; i++) sum += sorted[i];
+    double mean = static_cast<double>(sum) / used;
     return (mean - static_cast<double>(off)) / known_kg;
 }
 

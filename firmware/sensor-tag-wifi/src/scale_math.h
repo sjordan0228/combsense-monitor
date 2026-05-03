@@ -19,12 +19,14 @@ private:
 /// kg = (raw - off) / scale_factor
 double applyCalibration(int32_t raw, int64_t off, double scale_factor);
 
-/// Compute tare offset as integer mean of N raw samples.
-int64_t tareFromMean(const int32_t* samples, uint8_t n);
+/// Compute tare offset as the trimmed mean of N raw samples.
+/// trim=0: straight mean; trim=k: drop k lowest and k highest before averaging.
+int64_t tareFromMean(const int32_t* samples, uint8_t n, uint8_t trim = 0);
 
-/// Compute scale_factor = (mean(samples) - off) / known_kg.
+/// Compute scale_factor = (trimmed_mean(samples) - off) / known_kg.
+/// trim=0: straight mean; trim=k: drop k lowest and k highest before averaging.
 /// Returns 0.0 if known_kg is zero (caller must handle).
-double scaleFactorFromMean(const int32_t* samples, uint8_t n, int64_t off, double known_kg);
+double scaleFactorFromMean(const int32_t* samples, uint8_t n, int64_t off, double known_kg, uint8_t trim = 0);
 
 /// |measured - expected| / |expected| * 100. Returns -1.0 if expected == 0.
 double errorPct(double measured, double expected);
