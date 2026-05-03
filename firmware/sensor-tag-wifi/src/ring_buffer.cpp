@@ -9,11 +9,11 @@ namespace {
 
 // RTC slow memory persists across deep sleep.
 RTC_DATA_ATTR uint32_t rtcMagic = 0;
-RTC_DATA_ATTR uint8_t  rtcHead  = 0;    // write index
-RTC_DATA_ATTR uint8_t  rtcCount = 0;
+RTC_DATA_ATTR uint16_t rtcHead  = 0;    // write index — uint16 supports capacity > 255
+RTC_DATA_ATTR uint16_t rtcCount = 0;
 RTC_DATA_ATTR Reading  rtcBuf[RTC_BUFFER_CAPACITY];
 
-constexpr uint32_t MAGIC = 0xCB50A003u;  // bumped 2026-05-02: Reading layout grew weight_kg — old slots invalid
+constexpr uint32_t MAGIC = 0xCB50A004u;  // bumped 2026-05-03: rtcHead/rtcCount widened to uint16_t (capacity > 255), rtcBuf shifts in LP-SRAM
 
 }  // anonymous namespace
 
@@ -44,7 +44,7 @@ void push(const Reading& r) {
 
 bool peekOldest(Reading& out) {
     if (rtcCount == 0) return false;
-    uint8_t oldestIdx = (rtcHead + RTC_BUFFER_CAPACITY - rtcCount) % RTC_BUFFER_CAPACITY;
+    uint16_t oldestIdx = (rtcHead + RTC_BUFFER_CAPACITY - rtcCount) % RTC_BUFFER_CAPACITY;
     out = rtcBuf[oldestIdx];
     return true;
 }
@@ -54,7 +54,7 @@ void popOldest() {
     rtcCount--;
 }
 
-uint8_t size()     { return rtcCount; }
-uint8_t capacity() { return RTC_BUFFER_CAPACITY; }
+uint16_t size()     { return rtcCount; }
+uint16_t capacity() { return RTC_BUFFER_CAPACITY; }
 
 }  // namespace RingBuffer

@@ -17,10 +17,10 @@ bool peekOldest(Reading& out);
 void popOldest();
 
 /// Number of readings currently stored.
-uint8_t size();
+uint16_t size();
 
 /// Maximum capacity (compile-time).
-uint8_t capacity();
+uint16_t capacity();
 
 /// Reset buffer. Call from cold boot only — RTC memory is uninitialized then.
 void initIfColdBoot();

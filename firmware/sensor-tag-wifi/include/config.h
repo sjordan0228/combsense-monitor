@@ -67,7 +67,7 @@ constexpr const char* NVS_KEY_UPLOAD_EVERY = "upload_every";
 // RTC Ring Buffer
 // =============================================================================
 
-constexpr uint8_t RTC_BUFFER_CAPACITY = 48;   // 4h @ 5-min cadence
+constexpr uint16_t RTC_BUFFER_CAPACITY = 288;   // 24h @ 5-min cadence (288 × 28B = 8 KB of LP-SRAM)
 
 // =============================================================================
 // Sensors
