@@ -7,6 +7,8 @@
 
 #include "config.h"
 #include "config_parser.h"
+#include "config_runtime.h"
+#include "capabilities.h"
 #include "reading.h"
 #include "sensor.h"
 #include "battery.h"
@@ -49,15 +51,15 @@ void initDeviceId() {
              mac[2], mac[3], mac[4], mac[5]);
 }
 
-struct Config {
+struct WakeCfg {
     uint16_t sampleIntervalSec;   // seconds (U16 matches serial console putUShort path)
     uint8_t  uploadEveryN;
 };
 
-Config loadConfig() {
+WakeCfg loadConfig() {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
-    Config c {
+    WakeCfg c {
         .sampleIntervalSec = prefs.getUShort(NVS_KEY_SAMPLE_INT, DEFAULT_SAMPLE_INTERVAL_SEC),
         .uploadEveryN      = prefs.getUChar(NVS_KEY_UPLOAD_EVERY, DEFAULT_UPLOAD_EVERY_N),
     };
@@ -192,12 +194,18 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
     }
 }
 
+// Forward declaration — defined below uploadAndCheckOta.
+void sampleAndEnqueue();
+
 /// Drain readings over MQTT and run the OTA check inside a single WiFi window.
 /// OTA must share the radio session with MQTT — a separate connect after
 /// disconnect leaves a window where WiFi.mode(OFF) makes esp_http_client fail.
-void uploadAndCheckOta(uint8_t batteryPct) {
+/// bootEpoch: epoch second of cold boot (0 if NTP not yet synced).
+void uploadAndCheckOta(uint8_t batteryPct, int64_t bootEpoch) {
     if (!WifiManager::connect()) {
         Serial.println("[MAIN] no wifi — keeping buffer, skipping OTA");
+        // Still sample so the reading goes into the buffer for next-wake retry.
+        sampleAndEnqueue();
         return;
     }
 
@@ -210,6 +218,8 @@ void uploadAndCheckOta(uint8_t batteryPct) {
     bool mqttUp = MqttClient::connect(deviceId);
     if (!mqttUp) {
         Serial.println("[MAIN] no mqtt — keeping buffer, skipping config + OTA");
+        // Still sample so the reading goes into the buffer for next-wake retry.
+        sampleAndEnqueue();
     } else {
         // WiFi.RSSI() is int32_t; real-world range -100..-30 dBm fits int8_t.
         // Captured post-connect so association is confirmed.
@@ -228,6 +238,12 @@ void uploadAndCheckOta(uint8_t batteryPct) {
 
         // Subscribe to scale/cmd and scale/config; waits up to 1.5s for retained config.
         Scale::onConnect();
+
+        // §10.b: sample AFTER config is applied so feat_* flags are current.
+        sampleAndEnqueue();
+
+        // Publish capabilities with post-apply feature flag state.
+        Capabilities::publish(bootEpoch);
 
         // Now drain readings.
         uint8_t sent = 0;
@@ -339,19 +355,29 @@ void setup() {
         SerialConsole::checkForConsole();
     }
 
-    Config cfg = loadConfig();
+    WakeCfg cfg = loadConfig();
     Serial.printf("[MAIN] sample_int=%lus upload_every=%u\n",
                   (unsigned long)cfg.sampleIntervalSec, cfg.uploadEveryN);
 
     Scale::init();
 
-    sampleAndEnqueue();
+    // Capture boot epoch now (post-NTP-attempt inside WifiManager::getUnixTime on
+    // first upload). On non-upload cycles this is 0 — capabilities not published.
+    int64_t bootEpoch = 0;
+    {
+        time_t t = 0;
+        time(&t);
+        bootEpoch = (t > 1700000000) ? static_cast<int64_t>(t) : 0;
+    }
+
     rtcSampleCounter++;
 
     if (rtcSampleCounter >= cfg.uploadEveryN) {
-        uploadAndCheckOta(lastBatteryPct);
+        uploadAndCheckOta(lastBatteryPct, bootEpoch);
         rtcSampleCounter = 0;
     } else {
+        // Non-upload cycle: still sample and buffer; no MQTT/capabilities.
+        sampleAndEnqueue();
         Serial.printf("[MAIN] not uploading this cycle (%u/%u)\n",
                       rtcSampleCounter, cfg.uploadEveryN);
     }
