@@ -12,7 +12,7 @@ edges:
     condition: when needing the full data-flow diagram
   - target: context/setup.md
     condition: when checking systemd service status or log locations
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # Debug the MQTT → Influx → Grafana Pipeline

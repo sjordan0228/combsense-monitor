@@ -14,7 +14,7 @@ edges:
     condition: when understanding how to use a technology in this codebase
   - target: context/architecture.md
     condition: when seeing how a tech choice fits into the overall system
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # Stack
@@ -36,8 +36,9 @@ last_updated: 2026-04-26
 - **PubSubClient** (knolleary/PubSubClient@^2.8) — MQTT client. Used everywhere; `flush()` before WiFi teardown is mandatory on C6 to avoid TX-drain races.
 - **TinyGSM** — SIM7080G modem abstraction on the collector. TLS terminates on the modem, not the ESP32.
 - **Adafruit SHT31 Library** (^2.2.2) — temp/humidity. Heater burns off condensation in hive humidity range.
-- **OneWireNg** (^0.14.1) + **DallasTemperature** (^3.11.0) — DS18B20 path on sensor-tag-wifi (`xiao-c6-ds18b20`, `waveshare-s3zero-ds18b20` envs). The legacy `OneWire` library is `lib_ignore`d.
-- **Unity** (PlatformIO native test framework) — host-machine unit tests. sensor-tag-wifi has 38 native tests across payload, OTA manifest parser, OTA decision, OTA validate-on-boot, sha256 streamer, battery math.
+- **OneWireNg** (^0.14.1) + **DallasTemperature** (^3.11.0) — DS18B20 path on sensor-tag-wifi (`xiao-c6-ds18b20`, `waveshare-s3zero-ds18b20`, `*-scale` envs). The legacy `OneWire` library is `lib_ignore`d.
+- **bogde/HX711** — HX711 load-cell ADC driver for the scale subsystem (`*-scale` envs). Provides raw 24-bit differential reads; all filtering (trimmed-mean, MAD stable detector) is in `scale_math.cpp`.
+- **Unity** (PlatformIO native test framework) — host-machine unit tests. sensor-tag-wifi has **152 native tests** across test_payload, test_scale_payload, test_scale_math, test_scale_commands, test_config_parser, test_config_runtime, test_config_ack, test_config_get, test_capabilities, test_ota_decision, test_ota_manifest, test_ota_sha256, test_ota_validation, test_battery_math.
 - **gunicorn** + **nginx 1.22** — Django serving (combsense-web LXC).
 
 ## What We Deliberately Do NOT Use

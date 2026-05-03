@@ -1,7 +1,7 @@
 ---
 name: pattern-index
 description: Index of all reusable task patterns
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # Pattern Index

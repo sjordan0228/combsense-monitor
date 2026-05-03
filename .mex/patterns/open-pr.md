@@ -11,7 +11,7 @@ edges:
     condition: when verifying coding-standard compliance before review
   - target: patterns/pio-build-test.md
     condition: when running native tests as part of pre-PR verify
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # Open a Pull Request
@@ -43,7 +43,7 @@ Branch workflow:
 
 4. **Address review findings.** The review writes a markdown report. Real findings get fixed in new commits on the same branch (NOT amended into existing commits). Push and re-review if changes are substantive.
 5. **Create the PR:** `gh pr create --base <base-branch> --title "<title>" --body "<body>"`. Title under 70 chars; body has Summary + Test plan sections.
-6. **Wait for GitHub Actions checks.** The CI runs builds for all four firmware envs + native tests. All must pass.
+6. **Wait for GitHub Actions checks.** The CI runs builds for all firmware envs + native tests (152). All must pass.
 7. **Squash-merge** when ready: `gh pr merge <PR#> --squash`. We squash to keep `main`'s history flat.
 
 ## Gotchas

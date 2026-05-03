@@ -12,7 +12,7 @@ edges:
     condition: when configuring the dev environment for the first time
   - target: context/conventions.md
     condition: when adding a new firmware module that needs verify steps
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # PlatformIO Build & Test (Silent)
@@ -57,7 +57,7 @@ Green run: ~3 lines. Failure: enough log to diagnose.
 
 - The `-s` flag suppresses scons / progress output but keeps real warnings and errors. It is the right default for builds.
 - If a build fails and silent output doesn't reveal the cause, run **once** unfiltered and capture only the error block: `pio run 2>&1 | grep -A 5 -B 2 'error:'`. Do not paste the full log.
-- Native tests are host-machine only — they don't require a device. The `native` env in `platformio.ini` builds payload, OTA manifest, OTA decision, sha256, battery math files (see `build_src_filter`).
+- Native tests are host-machine only — they don't require a device. The `native` env in `platformio.ini` covers payload, scale_payload, scale_math, scale_commands, config_parser, config_runtime, config_ack, config_get, capabilities, OTA decision/manifest/sha256/validation, battery math (152 tests total).
 
 ## Verify
 

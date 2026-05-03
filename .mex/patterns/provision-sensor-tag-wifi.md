@@ -11,7 +11,7 @@ edges:
     condition: when finding the right port name or env var values
   - target: patterns/pio-build-test.md
     condition: when building the firmware before flashing
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # Provision a Sensor-Tag-WiFi Device
@@ -20,10 +20,12 @@ last_updated: 2026-04-26
 
 A fresh sensor-tag-wifi (XIAO ESP32-C6 or Waveshare S3-Zero) needs WiFi credentials, MQTT broker info, OTA host, and a `sensor_id` written to NVS before it can publish. Provisioning happens over the USB-CDC serial console using `tools/provision_tag.py`. Once provisioned, the tag persists everything in NVS and OTA updates do not touch this configuration.
 
-The right firmware variant must be flashed first — there are three envs:
-- `xiao-c6-sht31` — C6 + SHT31 dual temp/humidity (default)
+The right firmware variant must be flashed first — envs available:
+- `xiao-c6-sht31` — C6 + SHT31 dual temp/humidity
 - `xiao-c6-ds18b20` — C6 + DS18B20 dual probes
+- `xiao-c6-ds18b20-scale` — C6 + DS18B20 + HX711 scale subsystem (use for hives with load cells)
 - `waveshare-s3zero-ds18b20` — S3-Zero + DS18B20 (NOT recommended for solar/sleep; see ROUTER.md S3-Zero warning)
+- `waveshare-s3zero-ds18b20-scale` — S3-Zero + DS18B20 + scale (same S3-Zero caveats apply)
 
 ## Steps
 

@@ -15,7 +15,7 @@ edges:
     condition: when understanding how components connect during setup
   - target: patterns/INDEX.md
     condition: when looking for task-specific build/upload/provision patterns
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # Setup
@@ -74,7 +74,7 @@ Web creds (combsense-web LXC, `/root/.combsense-web-creds`, mode 600).
 - `pio test -e native 2>&1 | grep -E "(PASS|FAIL|Tests|Ignored)"` — silent native unit tests
 - `pio run -t upload --upload-port /dev/cu.usbmodem*` — flash a connected device
 - `pio device monitor --port /dev/cu.usbmodem*` — serial monitor (USB-CDC, 115200 baud)
-- `cd web && python manage.py test` — Django tests (19 currently passing)
+- `cd web && python manage.py test` — Django tests (19 currently passing for web/accounts + core)
 - `mex check` — drift score for `.mex/` scaffold
 - `ssh natas@192.168.1.16 "cd ~/repos/hivesense-monitor && git fetch origin && git checkout <branch> && ~/code-review/review.sh ~/repos/hivesense-monitor <base-branch> qwen3-coder:30b"` — pre-PR Ollama review (mandatory)
 - `curl -s http://192.168.1.16:11434/api/generate -d '{"model":"qwen3-coder:30b","prompt":"<prompt>","stream":false}'` — Ollama for boilerplate generation
@@ -87,3 +87,5 @@ Web creds (combsense-web LXC, `/root/.combsense-web-creds`, mode 600).
 - **Pre-NTP timestamps land as `t=0`**: this is correct. Telegraf overwrites with arrival time; firmware `t` is preserved as `sensor_ts` for forensics.
 - **Unprivileged LXC service fails with `226/NAMESPACE`**: stock Debian 12 systemd units use `PrivateMounts=true` etc. that the container can't satisfy. Add a drop-in at `/etc/systemd/system/<svc>.service.d/override.conf` setting each directive permissively.
 - **MH-CD42 boost shuts off during deep sleep**: load <45 mA for >32 s trips auto-shutoff. Don't use this module for sleep-based loads — use TP4056 + low-dropout LDO instead.
+- **Scale env not building?** Verify `bogde/HX711` is listed as a dependency in `platformio.ini` for the `*-scale` envs and that `lib_deps` inherited correctly.
+- **Feature-flag branch vs dev:** `feat-feature-flags` branch contains `config_runtime`, `capabilities`, `config_ack` modules. `dev` branch contains scale modules. Both are open PRs against `main`. Don't assume `dev` HEAD == current feature work; check branch.

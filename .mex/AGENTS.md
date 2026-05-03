@@ -1,13 +1,13 @@
 ---
 name: agents
 description: Always-loaded project anchor. Read this first. Contains project identity, non-negotiables, commands, and pointer to ROUTER.md for full context.
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # CombSense Monitor
 
 ## What This Is
-IoT beehive telemetry system: ESP32 sensor nodes (weight, temp/humidity, planned bee-traffic counter) communicate via ESP-NOW to a yard collector, then via cellular MQTT to HiveMQ Cloud — and via direct WiFi/MQTT to a local Mosquitto/Influx/Grafana stack — for iOS and Django web consumption.
+IoT beehive telemetry system: ESP32 sensor nodes (weight + HX711 scale, temp/humidity, planned bee-traffic counter) communicate via ESP-NOW to a yard collector, then via cellular MQTT to HiveMQ Cloud — and via direct WiFi/MQTT to a local Mosquitto/Influx/Grafana stack — for iOS and Django web consumption. Scale calibration and per-hive feature flags are driven via iOS↔firmware MQTT contracts.
 
 ## Non-Negotiables
 - Never commit directly to `main` — work on `dev`, PR to `main` ("prod" = `main`)
@@ -18,7 +18,7 @@ IoT beehive telemetry system: ESP32 sensor nodes (weight, temp/humidity, planned
 
 ## Commands
 - Build firmware (silent): `pio run -s 2>&1 | tail -5`
-- Native unit tests (silent): `pio test -e native 2>&1 | grep -E "(PASS|FAIL|Tests|Ignored)"`
+- Native unit tests (silent): `pio test -e native 2>&1 | grep -E "(PASS|FAIL|Tests|Ignored)"` — expect 152 tests passing
 - Upload + serial: `pio run -t upload && pio device monitor`
 - Web app dev: `cd web && python manage.py runserver`
 - Web app tests: `cd web && python manage.py test`

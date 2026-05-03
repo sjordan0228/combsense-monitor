@@ -14,12 +14,32 @@ edges:
     condition: when a decision drove a specific technology choice
   - target: context/conventions.md
     condition: when a decision is enforced as a coding convention
-last_updated: 2026-04-26
+last_updated: 2026-05-03
 ---
 
 # Decisions
 
-## ~~ESP32-WROOM-32 over ESP32-S3~~ → Switched to ESP32-S3
+## Easy Bee Counter: pivot to upstream hydronics2 PCB (2026-05-03)
+**Decision:** Abandon custom 8-pair IR beam-break + CD74HC4067 mux design in favour of the upstream open-source 2019-easy-bee-counter PCB by hydronics2 (24 gates / 48 sensors).
+**Why:** The upstream board is proven, already kicad-designed, and handles 3× the lanes of the custom plan with a dedicated MCU. Integrating bee counting into sensor-tag-wifi would complicate the power budget and OTA story. A separate board with its own MCU publishing `combsense/hive/<id>/bees/in|out|activity` keeps sensor-tag-wifi focused on environmental telemetry. Repo: `/Users/sjordan/Code/2019-easy-bee-counter/`.
+
+## 24-hour RTC ring buffer (288 readings) over 4-hour (48 readings) (2026-05-03)
+**Decision:** Expand `RTC_BUFFER_CAPACITY` from 48 to 288 readings (commit `047c513` on `dev`).
+**Why:** At 5-min cadence, 48 slots = 4 hours of offline resilience — insufficient for overnight outages or extended WiFi downtime. 288 slots = 24 hours covers a full day without data loss. Cost is negligible: RTC SRAM on ESP32 allows it; `rtcCount`/`rtcHead` widened to `uint16_t` to hold the larger count. MAGIC bumped (`0xCB50A003` → `0xCB50A004`) to invalidate stale RTC data on first boot after upgrade.
+
+## Per-hive feature flags via NVS + runtime API (2026-05-03)
+**Decision:** Feature flags (`feat_ds18b20`, `feat_sht31`, etc.) are stored in NVS and queried at runtime via `Config::isEnabled(name)`, rather than compile-time `#ifdef` only.
+**Why:** Compile-time flags require a separate OTA binary per feature combination — untenable at fleet scale. NVS-based flags let the iOS app configure any hive's feature set over MQTT without reflashing. The `config-mqtt-contract.md` defines the protocol; `config_ack` provides a rich ack with per-key result categories. Compile-time `HW_BOARD` flag still governs pin maps (can't change hardware at runtime).
+
+## HX711 on D8/D9 (GPIO 19/20), not D6/D7 (GPIO 16/17) (2026-05-03)
+**Decision:** HX711 DATA/CLK wired to XIAO C6 pins D8/D9 (GPIO 19/20). Earlier breadboard prototype used D6/D7.
+**Why:** D6/D7 (GPIO 16/17) conflict with boot-time strapping or peripheral assignment on the C6. Opus expert review (Scale Block B fixes) identified the conflict and moved to D8/D9. Pin constants are in `config.h` and overridable via build flags.
+
+## iOS-driven MQTT command contracts (scale + config) (2026-05-03)
+**Decision:** Complex multi-step operations (scale calibration, runtime config changes) are driven by the iOS app via retained MQTT topics with a structured command/response contract, rather than a REST API or BLE protocol.
+**Why:** The firmware is already MQTT-connected and deep-sleeping; a REST server would require holding WiFi open permanently. MQTT retained `scale/config` keep-alive extends the awake window on demand without polling. Contracts are versioned documents (`.mex/scale-mqtt-contract.md`, `.mex/config-mqtt-contract.md`) that both the iOS app and firmware teams agree on before implementation — this prevents silent incompatibilities across OTA updates.
+
+## ~~IR beam-break over thermal/ToF for bee counting~~ → Superseded by Easy Bee Counter pivot (2026-05-03)
 **Decision:** Use Freenove ESP32-S3 Lite (8MB flash) for hive nodes.
 **Why:** 8MB flash enables dual OTA partitions. BLE 5.0 improves sync throughput. Native USB. WROOM-32E with 8MB was hard to source; the S3 Lite is readily available at ~$7.
 
@@ -39,9 +59,9 @@ last_updated: 2026-04-26
 **Decision:** Support both BLE direct (at the yard) and MQTT cloud (remote).
 **Why:** Beekeepers need data at the yard without internet (BLE). They also want to check from home (MQTT). Both paths feed the same SwiftData model in the iOS app.
 
-## IR beam-break over thermal/ToF for bee counting
-**Decision:** Use IR break-beam pairs for v1 bee traffic counter.
-**Why:** Simple, cheap ($2/pair), proven, weather-independent (unlike thermal which fails when ambient matches bee body temp). 4 directional lanes with entrance reducer gives good relative traffic data. Can upgrade to thermal/ToF later.
+## ~~IR beam-break over thermal/ToF for bee counting~~ → Superseded by Easy Bee Counter pivot (2026-05-03)
+**Decision:** ~~Use IR break-beam pairs for v1 bee traffic counter.~~ Pivoted to hydronics2 2019-easy-bee-counter PCB (24 gates / 48 sensors). See "Easy Bee Counter: pivot" decision above.
+**Why (original):** Simple, cheap ($2/pair), proven, weather-independent. **Superseded because** the upstream board provides 3× the lanes with a proven design; custom hardware adds schedule and maintenance burden with no benefit.
 
 ## ESP32-S3 over WROOM-32
 **Decision:** Switch hive node target from ESP32-WROOM-32 (4MB) to Freenove ESP32-S3 Lite (8MB).
@@ -75,9 +95,8 @@ last_updated: 2026-04-26
 **Decision:** Collector broadcasts TIME_SYNC via ESP-NOW after every MQTT publish, not once daily.
 **Why:** Negligible cost (~100 µs per broadcast). Keeps hive node clocks accurate to within 30 minutes. Simpler logic — no "did I sync today" tracking.
 
-## Multiplexer for IR array
-**Decision:** Use 2× CD74HC4067 multiplexers for 8 IR pairs instead of direct GPIO.
-**Why:** Saves 10 GPIO pins (20 → 10). Enables pulsed operation for power savings. $1/chip. Channels 8-15 available for future expansion to 16 pairs.
+## ~~Multiplexer for IR array~~ → Superseded by Easy Bee Counter pivot (2026-05-03)
+**Decision:** ~~Use 2× CD74HC4067 multiplexers for 8 IR pairs instead of direct GPIO.~~ Moot — IR array design abandoned in favour of hydronics2 2019-easy-bee-counter PCB. See "Easy Bee Counter: pivot" decision above.
 
 ## InfluxDB 2.x over Timescale / plain Postgres
 **Decision:** Use InfluxDB 2.8 OSS (native Debian 12 LXC, no Docker) as the history TSDB, with Telegraf as the ingest side and Grafana for house dashboards.
