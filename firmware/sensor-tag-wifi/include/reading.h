@@ -20,8 +20,10 @@ struct Reading {
     float    humidity2;    // top   (%RH) — NAN if unavailable
     uint16_t vbat_mV;      // raw battery voltage at sample time
     uint8_t  battery_pct;  // 0..100
+    uint8_t  _pad;         // alignment padding
+    float    weight_kg;    // kg — NAN if scale not present or sample failed
 };
 
-static_assert(sizeof(Reading) == 24,
+static_assert(sizeof(Reading) == 28,
               "Reading layout changed — bump RingBuffer MAGIC to invalidate "
               "stale RTC slots after OTA. See ring_buffer.cpp.");

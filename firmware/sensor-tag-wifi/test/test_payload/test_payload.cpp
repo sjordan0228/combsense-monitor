@@ -16,6 +16,8 @@ void test_serialize_full_reading_with_humidity() {
         .humidity2 = 55.1f,
         .vbat_mV = 3987,
         .battery_pct = 87,
+        ._pad = 0,
+        .weight_kg = NAN,
     };
     char buf[200];
     int n = Payload::serialize("ab12cd34", "5423c04", -58, r, buf, sizeof(buf));
@@ -36,6 +38,8 @@ void test_serialize_ds18b20_reading_omits_humidity() {
         .humidity2 = NAN,
         .vbat_mV = 3987,
         .battery_pct = 87,
+        ._pad = 0,
+        .weight_kg = NAN,
     };
     char buf[200];
     int n = Payload::serialize("ab12cd34", "5423c04", -58, r, buf, sizeof(buf));
@@ -53,6 +57,8 @@ void test_serialize_returns_negative_on_undersized_buffer() {
         .humidity1 = 52.3f, .humidity2 = 55.1f,
         .vbat_mV = 3987,
         .battery_pct = 87,
+        ._pad = 0,
+        .weight_kg = NAN,
     };
     char buf[8];
     int n = Payload::serialize("ab12cd34", "5423c04", -58, r, buf, sizeof(buf));
@@ -68,6 +74,8 @@ void test_serialize_emits_only_valid_humidity_channel() {
         .humidity2 = NAN,      // top SHT31 failed
         .vbat_mV = 3987,
         .battery_pct = 87,
+        ._pad = 0,
+        .weight_kg = NAN,
     };
     char buf[200];
     int n = Payload::serialize("ab12cd34", "5423c04", -58, r, buf, sizeof(buf));
@@ -90,6 +98,8 @@ void test_serialize_emits_null_for_nan_temps() {
         .humidity2 = NAN,
         .vbat_mV = 0,
         .battery_pct = 0,
+        ._pad = 0,
+        .weight_kg = NAN,
     };
     char buf[200];
     int n = Payload::serialize("c5fffe12", "5423c04", -58, r, buf, sizeof(buf));

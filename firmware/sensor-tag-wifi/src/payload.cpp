@@ -42,10 +42,12 @@ int serialize(const char* deviceId,
     if (!appendNumOrNull(p, end, "t2", r.temp2)) return -1;
     if (!std::isnan(r.humidity1) && !appendf(p, end, ",\"h1\":%.2f", r.humidity1)) return -1;
     if (!std::isnan(r.humidity2) && !appendf(p, end, ",\"h2\":%.2f", r.humidity2)) return -1;
-    if (!appendf(p, end, ",\"vbat_mV\":%u,\"rssi\":%d,\"b\":%u}",
+    if (!appendf(p, end, ",\"vbat_mV\":%u,\"rssi\":%d,\"b\":%u",
                  static_cast<unsigned>(r.vbat_mV),
                  static_cast<int>(rssi),
                  static_cast<unsigned>(r.battery_pct))) return -1;
+    if (std::isfinite(r.weight_kg) && !appendf(p, end, ",\"w\":%.2f", r.weight_kg)) return -1;
+    if (!appendf(p, end, "}")) return -1;
 
     return static_cast<int>(p - buf);
 }
