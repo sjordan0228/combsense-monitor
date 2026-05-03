@@ -335,6 +335,32 @@ bool sample(int32_t& raw, double& kg) {
     return true;
 }
 
+bool sampleAveraged(uint8_t n, int32_t& raw_mean, double& kg) {
+    constexpr uint8_t kMaxN = 20;
+    if (n < 3) n = 3;  // need at least 3 to drop hi/lo and have remainder
+    if (n > kMaxN) n = kMaxN;
+
+    int32_t buf[kMaxN];
+    for (uint8_t i = 0; i < n; i++) {
+        if (!hx711.wait_ready_timeout(HX711_READ_TIMEOUT_MS)) {
+            kg = NAN;
+            raw_mean = 0;
+            return false;
+        }
+        buf[i] = hx711.read();
+        stable_.push(buf[i]);
+    }
+
+    // Drop min and max, average the rest
+    std::sort(buf, buf + n);
+    int64_t sum = 0;
+    uint8_t used = n - 2;  // drop 1 low, 1 high
+    for (uint8_t i = 1; i < n - 1; i++) sum += buf[i];
+    raw_mean = static_cast<int32_t>(sum / used);
+    kg = applyCalibration(raw_mean, weight_off_, weight_scl_);
+    return true;
+}
+
 void subscribe() {
     if (cmd_topic_[0] == '\0') buildTopics(MqttClient::getDeviceId());
     MqttClient::subscribe(cmd_topic_);
@@ -434,6 +460,7 @@ namespace Scale {
 void init() {}
 void deinit() {}
 bool sample(int32_t&, double& kg) { kg = NAN; return false; }
+bool sampleAveraged(uint8_t, int32_t& raw_mean, double& kg) { raw_mean = 0; kg = NAN; return false; }
 void subscribe() {}
 void onMessage(const char*, const char*, unsigned int) {}
 void tick() {}

@@ -289,7 +289,7 @@ void sampleAndEnqueue() {
     // Sample the scale (no-op stub when SCALE_ENABLED is not defined).
     int32_t scale_raw = 0;
     double  scale_kg  = NAN;
-    Scale::sample(scale_raw, scale_kg);
+    Scale::sampleAveraged(10, scale_raw, scale_kg);
     // Only record weight if the scale has been calibrated; NaN causes payload to omit the field.
     r.weight_kg = Scale::isCalibrated() ? static_cast<float>(scale_kg) : NAN;
 

@@ -6,7 +6,8 @@ namespace Scale {
 
 void init();
 void deinit();
-bool sample(int32_t& raw, double& kg);   // false on HX711 timeout
+bool sample(int32_t& raw, double& kg);           // false on HX711 timeout
+bool sampleAveraged(uint8_t n, int32_t& raw_mean, double& kg);  // trimmed mean (drops hi/lo)
 
 void subscribe();                         // call after MQTT connect
 void onMessage(const char* topic, const char* payload, unsigned int len);
