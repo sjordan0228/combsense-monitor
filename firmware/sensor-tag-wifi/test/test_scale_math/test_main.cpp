@@ -1,4 +1,3 @@
-#define UNITY_INCLUDE_DOUBLE
 #include <unity.h>
 #include "scale_math.h"
 
