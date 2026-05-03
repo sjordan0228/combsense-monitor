@@ -11,9 +11,16 @@ namespace {
 
 bool isInRejectedList(const ConfigUpdate& u, const char* key) {
     for (uint8_t i = 0; i < u.num_rejected; ++i) {
-        if (strcmp(u.rejected[i], key) == 0) return true;
+        if (strcmp(u.rejected[i].key, key) == 0) return true;
     }
     return false;
+}
+
+const char* rejectedReason(const ConfigUpdate& u, const char* key) {
+    for (uint8_t i = 0; i < u.num_rejected; ++i) {
+        if (strcmp(u.rejected[i].key, key) == 0) return u.rejected[i].reason;
+    }
+    return nullptr;
 }
 
 }  // namespace
@@ -265,6 +272,32 @@ void test_rejected_list_does_not_overflow() {
     TEST_ASSERT_LESS_OR_EQUAL_UINT8(ConfigParser::MAX_REJECTED_KEYS, u.num_rejected);
 }
 
+// --- §6 reason-field tests ---------------------------------------------------
+
+void test_excluded_key_carries_excluded_reason() {
+    ConfigUpdate u;
+    TEST_ASSERT_TRUE(parse("{\"wifi_pass\":\"123\"}", u));
+    TEST_ASSERT_EQUAL_UINT8(1, u.num_rejected);
+    TEST_ASSERT_EQUAL_STRING("wifi_pass",         u.rejected[0].key);
+    TEST_ASSERT_EQUAL_STRING("excluded:wifi_pass", u.rejected[0].reason);
+}
+
+void test_unknown_key_carries_unknown_reason() {
+    ConfigUpdate u;
+    TEST_ASSERT_TRUE(parse("{\"frobnicate\":\"x\"}", u));
+    TEST_ASSERT_EQUAL_UINT8(1, u.num_rejected);
+    TEST_ASSERT_EQUAL_STRING("frobnicate",  u.rejected[0].key);
+    TEST_ASSERT_EQUAL_STRING("unknown_key", u.rejected[0].reason);
+}
+
+void test_invalid_feat_value_carries_invalid_reason() {
+    ConfigUpdate u;
+    TEST_ASSERT_TRUE(parse("{\"feat_scale\":7}", u));
+    TEST_ASSERT_EQUAL_UINT8(1, u.num_rejected);
+    TEST_ASSERT_EQUAL_STRING("feat_scale",         u.rejected[0].key);
+    TEST_ASSERT_EQUAL_STRING("invalid:not_0_or_1", u.rejected[0].reason);
+}
+
 // --- Unity test runner ------------------------------------------------------
 
 void setUp(void) {}
@@ -309,6 +342,10 @@ int main(int, char**) {
     RUN_TEST(test_empty_object_returns_true_no_apply);
 
     RUN_TEST(test_rejected_list_does_not_overflow);
+
+    RUN_TEST(test_excluded_key_carries_excluded_reason);
+    RUN_TEST(test_unknown_key_carries_unknown_reason);
+    RUN_TEST(test_invalid_feat_value_carries_invalid_reason);
 
     return UNITY_END();
 }

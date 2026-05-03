@@ -31,6 +31,7 @@ constexpr size_t   TAG_NAME_MAX_LEN   = 64;
 constexpr size_t   OTA_HOST_MAX_LEN   = 64;
 constexpr size_t   MAX_REJECTED_KEYS  = 8;
 constexpr size_t   REJECTED_KEY_LEN   = 32;
+constexpr size_t   REJECTED_REASON_LEN = 32;
 
 /// Parsed feat_* flag value — distinguishes "not present" from 0/1.
 enum class FeatFlag : uint8_t {
@@ -62,7 +63,11 @@ struct ConfigUpdate {
     FeatFlag feat_mic;
 
     uint8_t  num_rejected;
-    char     rejected[MAX_REJECTED_KEYS][REJECTED_KEY_LEN];
+    struct RejectedKey {
+        char key[REJECTED_KEY_LEN];
+        char reason[REJECTED_REASON_LEN];
+    };
+    RejectedKey rejected[MAX_REJECTED_KEYS];
 };
 
 /// Parse and validate a config JSON payload.

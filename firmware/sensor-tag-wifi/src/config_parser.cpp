@@ -7,13 +7,26 @@ namespace ConfigParser {
 
 namespace {
 
-void recordReject(ConfigUpdate& out, const char* key) {
+bool isExcludedKey(const char* key) {
+    return strcmp(key, "wifi_ssid")  == 0 ||
+           strcmp(key, "wifi_pass")  == 0 ||
+           strcmp(key, "mqtt_host")  == 0 ||
+           strcmp(key, "mqtt_port")  == 0 ||
+           strcmp(key, "mqtt_user")  == 0 ||
+           strcmp(key, "mqtt_pass")  == 0;
+}
+
+void recordReject(ConfigUpdate& out, const char* key, const char* reason) {
     if (out.num_rejected >= MAX_REJECTED_KEYS) return;
-    char* slot = out.rejected[out.num_rejected];
-    size_t n = strlen(key);
-    if (n >= REJECTED_KEY_LEN) n = REJECTED_KEY_LEN - 1;
-    memcpy(slot, key, n);
-    slot[n] = '\0';
+    ConfigUpdate::RejectedKey& slot = out.rejected[out.num_rejected];
+    size_t kn = strlen(key);
+    if (kn >= REJECTED_KEY_LEN) kn = REJECTED_KEY_LEN - 1;
+    memcpy(slot.key, key, kn);
+    slot.key[kn] = '\0';
+    size_t rn = strlen(reason);
+    if (rn >= REJECTED_REASON_LEN) rn = REJECTED_REASON_LEN - 1;
+    memcpy(slot.reason, reason, rn);
+    slot.reason[rn] = '\0';
     out.num_rejected += 1;
 }
 
@@ -36,12 +49,12 @@ bool isAllowedStringValue(const char* s, size_t maxLen) {
 /// Records key in rejected list with the "invalid:not_0_or_1" suffix on bad range.
 static FeatFlag parseFeatFlag(JsonVariant val, const char* key, ConfigUpdate& out) {
     if (!val.is<int>()) {
-        recordReject(out, key);
+        recordReject(out, key, "invalid:not_0_or_1");
         return FeatFlag::Absent;
     }
     int v = val.as<int>();
     if (v != 0 && v != 1) {
-        recordReject(out, key);
+        recordReject(out, key, "invalid:not_0_or_1");
         return FeatFlag::Absent;
     }
     return (v == 1) ? FeatFlag::On : FeatFlag::Off;
@@ -71,12 +84,12 @@ bool parse(const char* json, ConfigUpdate& out) {
         // sample_int
         if (strcmp(key, "sample_int") == 0) {
             if (!kv.value().is<int>()) {
-                recordReject(out, key);
+                recordReject(out, key, "invalid:wrong_type");
                 continue;
             }
             int v = kv.value().as<int>();
             if (v < SAMPLE_INT_MIN || v > SAMPLE_INT_MAX) {
-                recordReject(out, key);
+                recordReject(out, key, "invalid:out_of_range");
                 continue;
             }
             out.has_sample_int = true;
@@ -87,12 +100,12 @@ bool parse(const char* json, ConfigUpdate& out) {
         // upload_every
         if (strcmp(key, "upload_every") == 0) {
             if (!kv.value().is<int>()) {
-                recordReject(out, key);
+                recordReject(out, key, "invalid:wrong_type");
                 continue;
             }
             int v = kv.value().as<int>();
             if (v < UPLOAD_EVERY_MIN || v > UPLOAD_EVERY_MAX) {
-                recordReject(out, key);
+                recordReject(out, key, "invalid:out_of_range");
                 continue;
             }
             out.has_upload_every = true;
@@ -103,12 +116,12 @@ bool parse(const char* json, ConfigUpdate& out) {
         // tag_name
         if (strcmp(key, "tag_name") == 0) {
             if (!kv.value().is<const char*>()) {
-                recordReject(out, key);
+                recordReject(out, key, "invalid:wrong_type");
                 continue;
             }
             const char* s = kv.value().as<const char*>();
             if (!isAllowedStringValue(s, TAG_NAME_MAX_LEN)) {
-                recordReject(out, key);
+                recordReject(out, key, "invalid:string_too_long");
                 continue;
             }
             out.has_tag_name = true;
@@ -119,12 +132,12 @@ bool parse(const char* json, ConfigUpdate& out) {
         // ota_host
         if (strcmp(key, "ota_host") == 0) {
             if (!kv.value().is<const char*>()) {
-                recordReject(out, key);
+                recordReject(out, key, "invalid:wrong_type");
                 continue;
             }
             const char* s = kv.value().as<const char*>();
             if (!isAllowedStringValue(s, OTA_HOST_MAX_LEN)) {
-                recordReject(out, key);
+                recordReject(out, key, "invalid:string_too_long");
                 continue;
             }
             out.has_ota_host = true;
@@ -154,10 +167,15 @@ bool parse(const char* json, ConfigUpdate& out) {
             continue;
         }
 
-        // Anything else — unknown key OR an excluded-by-policy key
-        // (wifi_ssid, wifi_pass, mqtt_host, mqtt_user, mqtt_pass).
-        // Both classes get the same treatment in v1: silent reject.
-        recordReject(out, key);
+        // Anything else — excluded-by-policy key or genuinely unknown key.
+        // §6: report distinct reasons so the ack can carry the right category.
+        if (isExcludedKey(key)) {
+            char reason[REJECTED_REASON_LEN];
+            snprintf(reason, sizeof(reason), "excluded:%s", key);
+            recordReject(out, key, reason);
+        } else {
+            recordReject(out, key, "unknown_key");
+        }
     }
 
     return true;

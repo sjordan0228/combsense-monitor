@@ -283,11 +283,11 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
         for (size_t i = 0; i < preValidCount && numEntries < MAX_ACK; ++i) {
             allEntries[numEntries++] = preValidEntries[i];
         }
-        // Also add parser-rejected keys (unknown / invalid value).
+        // Also add parser-rejected keys with their specific reason.
         for (uint8_t i = 0; i < parsed.num_rejected && numEntries < MAX_ACK; ++i) {
             AckEntry& e = allEntries[numEntries++];
-            strncpy(e.key,    parsed.rejected[i], sizeof(e.key)    - 1); e.key[sizeof(e.key) - 1]       = '\0';
-            strncpy(e.result, "unknown_key",       sizeof(e.result) - 1); e.result[sizeof(e.result) - 1] = '\0';
+            strncpy(e.key,    parsed.rejected[i].key,    sizeof(e.key)    - 1); e.key[sizeof(e.key) - 1]       = '\0';
+            strncpy(e.result, parsed.rejected[i].reason, sizeof(e.result) - 1); e.result[sizeof(e.result) - 1] = '\0';
         }
         Serial.println("[CONFIG] preValidate rejected — aborting apply");
     } else {
@@ -299,11 +299,11 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
         for (size_t i = 0; i < applied.numEntries && numEntries < MAX_ACK; ++i) {
             allEntries[numEntries++] = applied.entries[i];
         }
-        // Parser-rejected keys → "unknown_key" (they were not even attempted).
+        // Parser-rejected keys — carry the specific reason from the parser.
         for (uint8_t i = 0; i < parsed.num_rejected && numEntries < MAX_ACK; ++i) {
             AckEntry& e = allEntries[numEntries++];
-            strncpy(e.key,    parsed.rejected[i], sizeof(e.key)    - 1); e.key[sizeof(e.key) - 1]       = '\0';
-            strncpy(e.result, "unknown_key",       sizeof(e.result) - 1); e.result[sizeof(e.result) - 1] = '\0';
+            strncpy(e.key,    parsed.rejected[i].key,    sizeof(e.key)    - 1); e.key[sizeof(e.key) - 1]       = '\0';
+            strncpy(e.result, parsed.rejected[i].reason, sizeof(e.result) - 1); e.result[sizeof(e.result) - 1] = '\0';
         }
 
         // §2: clear broker-side retain BEFORE publishing ack.
