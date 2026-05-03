@@ -84,6 +84,74 @@ void test_parse_invalid_json_fails() {
     TEST_ASSERT_FALSE(ok);
 }
 
+void test_serialize_awake() {
+    char buf[256];
+    int n = serializeAwakeEvent(1777759800, 1777759714, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0, n);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event\":\"awake\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"keep_alive_until\":\"2026-05-02T22:10:00Z\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"ts\":\"2026-05-02T22:08:34Z\""));
+}
+
+void test_serialize_tare_saved() {
+    char buf[256];
+    serializeTareSavedEvent(1234567, 1777759714, buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event\":\"tare_saved\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"raw_offset\":1234567"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"ts\":\"2026-05-02T22:08:34Z\""));
+}
+
+void test_serialize_calibration_saved() {
+    char buf[256];
+    serializeCalibrationSavedEvent(4567.89, 1.8, 1777759714, buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event\":\"calibration_saved\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"scale_factor\":4567.89"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"predicted_accuracy_pct\":1.8"));
+}
+
+void test_serialize_verify_result() {
+    char buf[256];
+    serializeVerifyResultEvent(4.97, 5.0, 0.6, 1777759714, buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event\":\"verify_result\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"measured_kg\":4.97"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"expected_kg\":5"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"error_pct\":0.6"));
+}
+
+void test_serialize_raw_stream() {
+    char buf[256];
+    serializeRawStreamEvent(5678901, 47.32, true, 1777759714, buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event\":\"raw_stream\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"raw_value\":5678901"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"kg\":47.32"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"stable\":true"));
+}
+
+void test_serialize_modify_complete() {
+    char buf[256];
+    serializeModifyCompleteEvent("added_super_deep", 47.3, 58.1, 10.8, 287, false,
+                                 1777759714, buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event\":\"modify_complete\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"label\":\"added_super_deep\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"delta_kg\":10.8"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"tare_updated\":false"));
+}
+
+void test_serialize_modify_warning() {
+    char buf[256];
+    serializeModifyWarningEvent("inspection_only", 0.2, "no_significant_change_detected",
+                                1777759714, buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event\":\"modify_warning\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"warning\":\"no_significant_change_detected\""));
+}
+
+void test_serialize_error() {
+    char buf[256];
+    serializeErrorEvent("hx711_unresponsive", "no DOUT pulse for 1s", 1777759714, buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event\":\"error\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"code\":\"hx711_unresponsive\""));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_parse_tare);
@@ -97,5 +165,13 @@ int main(int, char**) {
     RUN_TEST(test_parse_unknown_cmd_fails);
     RUN_TEST(test_parse_missing_required_field_fails);
     RUN_TEST(test_parse_invalid_json_fails);
+    RUN_TEST(test_serialize_awake);
+    RUN_TEST(test_serialize_tare_saved);
+    RUN_TEST(test_serialize_calibration_saved);
+    RUN_TEST(test_serialize_verify_result);
+    RUN_TEST(test_serialize_raw_stream);
+    RUN_TEST(test_serialize_modify_complete);
+    RUN_TEST(test_serialize_modify_warning);
+    RUN_TEST(test_serialize_error);
     return UNITY_END();
 }
