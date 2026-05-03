@@ -4,6 +4,7 @@
 #include "scale_math.h"
 #include "scale_commands.h"
 #include "config.h"
+#include "config_runtime.h"
 #include "mqtt_client.h"
 #include "payload.h"
 
@@ -307,6 +308,7 @@ void publishStreamSample() {
 namespace Scale {
 
 void init() {
+    if (!Config::isEnabled("feat_scale")) return;
     hx711.begin(PIN_HX711_DT_, PIN_HX711_SCK_, HX711_GAIN);
     hx711.power_up();
     delay(450);                                          // datasheet: 400ms typ settling
@@ -324,6 +326,11 @@ void deinit() {
 }
 
 bool sample(int32_t& raw, double& kg) {
+    if (!Config::isEnabled("feat_scale")) {
+        kg = NAN;
+        raw = 0;
+        return false;
+    }
     if (!hx711.wait_ready_timeout(HX711_READ_TIMEOUT_MS)) {
         kg = NAN;
         raw = 0;
