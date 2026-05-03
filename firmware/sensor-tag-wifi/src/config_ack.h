@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config_ack_result.h"
 #include "config_parser.h"
 #include <cstddef>
 #include <cstdint>

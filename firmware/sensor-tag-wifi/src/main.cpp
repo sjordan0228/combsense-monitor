@@ -97,7 +97,8 @@ void appendEntry(ApplyResult& r, const char* key, const char* result) {
 }
 
 /// Write a uint8 feat flag to NVS if the new value differs from current.
-/// Records "ok" on write, "unchanged" if same, "invalid:nvs" on write failure.
+/// Records AckResult::OK on write, AckResult::UNCHANGED if same,
+/// AckResult::INVALID_NVS_WRITE on write failure.
 void applyFeatFlag(Preferences& prefs, ApplyResult& r,
                    const char* nvsKey, ConfigParser::FeatFlag flag,
                    uint8_t defaultVal) {
@@ -105,15 +106,15 @@ void applyFeatFlag(Preferences& prefs, ApplyResult& r,
     uint8_t cur      = prefs.getUChar(nvsKey, defaultVal);
     r.anyFeatTouched = true;
     if (cur == incoming) {
-        appendEntry(r, nvsKey, "unchanged");
+        appendEntry(r, nvsKey, AckResult::UNCHANGED);
     } else {
         size_t written = prefs.putUChar(nvsKey, incoming);
         if (written > 0) {
-            appendEntry(r, nvsKey, "ok");
+            appendEntry(r, nvsKey, AckResult::OK);
             r.anyFeatChanged = true;
         } else {
             Serial.printf("[CONFIG] NVS write failed for key=%s\n", nvsKey);
-            appendEntry(r, nvsKey, "invalid:nvs");
+            appendEntry(r, nvsKey, AckResult::INVALID_NVS_WRITE);
         }
     }
 }
@@ -135,56 +136,56 @@ ApplyResult applyConfigToNvs(const ConfigParser::ConfigUpdate& u) {
     if (u.has_sample_int) {
         uint16_t cur = prefs.getUShort(NVS_KEY_SAMPLE_INT, DEFAULT_SAMPLE_INTERVAL_SEC);
         if (cur == u.sample_int) {
-            appendEntry(r, "sample_int", "unchanged");
+            appendEntry(r, "sample_int", AckResult::UNCHANGED);
         } else {
             size_t written = prefs.putUShort(NVS_KEY_SAMPLE_INT, u.sample_int);
             if (written > 0) {
-                appendEntry(r, "sample_int", "ok");
+                appendEntry(r, "sample_int", AckResult::OK);
             } else {
                 Serial.println("[CONFIG] NVS write failed for key=sample_int");
-                appendEntry(r, "sample_int", "invalid:nvs");
+                appendEntry(r, "sample_int", AckResult::INVALID_NVS_WRITE);
             }
         }
     }
     if (u.has_upload_every) {
         uint8_t cur = prefs.getUChar(NVS_KEY_UPLOAD_EVERY, DEFAULT_UPLOAD_EVERY_N);
         if (cur == u.upload_every) {
-            appendEntry(r, "upload_every", "unchanged");
+            appendEntry(r, "upload_every", AckResult::UNCHANGED);
         } else {
             size_t written = prefs.putUChar(NVS_KEY_UPLOAD_EVERY, u.upload_every);
             if (written > 0) {
-                appendEntry(r, "upload_every", "ok");
+                appendEntry(r, "upload_every", AckResult::OK);
             } else {
                 Serial.println("[CONFIG] NVS write failed for key=upload_every");
-                appendEntry(r, "upload_every", "invalid:nvs");
+                appendEntry(r, "upload_every", AckResult::INVALID_NVS_WRITE);
             }
         }
     }
     if (u.has_tag_name) {
         String cur = prefs.getString(NVS_KEY_TAG_NAME, "");
         if (cur == u.tag_name) {
-            appendEntry(r, "tag_name", "unchanged");
+            appendEntry(r, "tag_name", AckResult::UNCHANGED);
         } else {
             size_t written = prefs.putString(NVS_KEY_TAG_NAME, u.tag_name);
             if (written > 0) {
-                appendEntry(r, "tag_name", "ok");
+                appendEntry(r, "tag_name", AckResult::OK);
             } else {
                 Serial.println("[CONFIG] NVS write failed for key=tag_name");
-                appendEntry(r, "tag_name", "invalid:nvs");
+                appendEntry(r, "tag_name", AckResult::INVALID_NVS_WRITE);
             }
         }
     }
     if (u.has_ota_host) {
         String cur = prefs.getString(NVS_KEY_OTA_HOST, OTA_DEFAULT_HOST);
         if (cur == u.ota_host) {
-            appendEntry(r, "ota_host", "unchanged");
+            appendEntry(r, "ota_host", AckResult::UNCHANGED);
         } else {
             size_t written = prefs.putString(NVS_KEY_OTA_HOST, u.ota_host);
             if (written > 0) {
-                appendEntry(r, "ota_host", "ok");
+                appendEntry(r, "ota_host", AckResult::OK);
             } else {
                 Serial.println("[CONFIG] NVS write failed for key=ota_host");
-                appendEntry(r, "ota_host", "invalid:nvs");
+                appendEntry(r, "ota_host", AckResult::INVALID_NVS_WRITE);
             }
         }
     }

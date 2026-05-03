@@ -1,6 +1,8 @@
 #include "config_parser.h"
+#include "config_ack_result.h"
 
 #include <ArduinoJson.h>
+#include <cstdio>
 #include <cstring>
 
 namespace ConfigParser {
@@ -174,7 +176,7 @@ bool parse(const char* json, ConfigUpdate& out) {
             snprintf(reason, sizeof(reason), "excluded:%s", key);
             recordReject(out, key, reason);
         } else {
-            recordReject(out, key, "unknown_key");
+            recordReject(out, key, AckResult::UNKNOWN_KEY);
         }
     }
 
