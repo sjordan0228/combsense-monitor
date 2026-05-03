@@ -176,7 +176,7 @@ void cmdCalibrate(double known_kg) {
     }
     writeScaleToNvs(sf);
 
-    // Stub predicted accuracy = sample stddev / mean * 100
+    // 95% CI half-width as % of known_kg
     int64_t sum = 0;
     for (uint8_t i = 0; i < HX711_TARE_SAMPLE_COUNT; i++) sum += samples[i];
     double mean = double(sum) / HX711_TARE_SAMPLE_COUNT;
@@ -186,7 +186,8 @@ void cmdCalibrate(double known_kg) {
         var += d * d;
     }
     double stddev = std::sqrt(var / HX711_TARE_SAMPLE_COUNT);
-    double predicted = (mean != 0.0) ? (stddev / std::fabs(mean) * 100.0) : 0.0;
+    double ci95_kg = 1.96 * stddev / std::sqrt(HX711_TARE_SAMPLE_COUNT) / std::fabs(sf);
+    double predicted = (known_kg != 0.0) ? (ci95_kg / known_kg * 100.0) : 0.0;
 
     char buf[200];
     serializeCalibrationSavedEvent(sf, predicted, nowEpoch(), buf, sizeof(buf));
