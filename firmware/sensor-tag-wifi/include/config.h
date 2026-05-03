@@ -52,6 +52,19 @@ constexpr const char* MQTT_TOPIC_PREFIX  = "combsense/hive/";
 // NVS
 // =============================================================================
 
+// NVS NAMESPACE INVARIANT: never hold a Preferences handle open across a
+// pubsub.loop() call or any other yield point.  The MQTT callback path
+// (handleConfigMessage → applyConfigToNvs) and other modules (scale.cpp,
+// loadConfig, buildAckJson) all share the "combsense" namespace; a concurrent
+// prefs.begin() on the same namespace from a callback while another caller
+// still holds it open fails silently on ESP-IDF.
+//
+// Required pattern — always: begin() → put/get → end() within the same
+// synchronous block.  Do NOT pass a Preferences handle across function
+// boundaries that may yield.  Audit note (2026-05-02): confirmed all
+// prefs.begin/end pairs in main.cpp, scale.cpp, and serial_console.cpp are
+// scoped strictly within synchronous blocks with no pubsub.loop() calls
+// between begin() and end().
 constexpr const char* NVS_NAMESPACE        = "combsense";
 constexpr const char* NVS_KEY_WIFI_SSID    = "wifi_ssid";
 constexpr const char* NVS_KEY_WIFI_PASS    = "wifi_pass";
