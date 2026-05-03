@@ -1,6 +1,7 @@
 #include "scale_math.h"
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 
 void StableDetector::push(int32_t raw) {
     ring_[head_] = raw;
@@ -46,4 +47,18 @@ double scaleFactorFromMean(const int32_t* samples, uint8_t n, int64_t off, doubl
 double errorPct(double measured, double expected) {
     if (expected == 0.0) return -1.0;
     return std::fabs(measured - expected) / std::fabs(expected) * 100.0;
+}
+
+bool isKeepAliveValid(int64_t keep_alive_until, int64_t now) {
+    if (keep_alive_until <= 0) return false;
+    if (keep_alive_until > now) return true;
+    return keep_alive_until > (now - CLOCK_SKEW_TOLERANCE_SEC);
+}
+
+size_t formatRFC3339(int64_t epoch, char* buf, size_t bufsz) {
+    if (bufsz < 21) return 0;
+    time_t t = static_cast<time_t>(epoch);
+    struct tm utc;
+    gmtime_r(&t, &utc);
+    return strftime(buf, bufsz, "%Y-%m-%dT%H:%M:%SZ", &utc);
 }

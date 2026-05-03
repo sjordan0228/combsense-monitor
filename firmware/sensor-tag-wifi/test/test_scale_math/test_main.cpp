@@ -92,6 +92,42 @@ void test_error_pct_zero_expected_returns_neg_one() {
     TEST_ASSERT_EQUAL_DOUBLE(-1.0, errorPct(1.0, 0.0));
 }
 
+void test_keep_alive_future_is_valid() {
+    int64_t now = 1777750000;
+    TEST_ASSERT_TRUE(isKeepAliveValid(now + 600, now));
+}
+
+void test_keep_alive_small_skew_past_is_valid() {
+    int64_t now = 1777750000;
+    TEST_ASSERT_TRUE(isKeepAliveValid(now - 60, now));         // 1 min skew
+    TEST_ASSERT_TRUE(isKeepAliveValid(now - 299, now));        // just under 5 min
+}
+
+void test_keep_alive_large_past_is_invalid() {
+    int64_t now = 1777750000;
+    TEST_ASSERT_FALSE(isKeepAliveValid(now - 301, now));       // just over 5 min
+    TEST_ASSERT_FALSE(isKeepAliveValid(now - 3600, now));      // 1 hour past
+}
+
+void test_keep_alive_zero_is_invalid() {
+    int64_t now = 1777750000;
+    TEST_ASSERT_FALSE(isKeepAliveValid(0, now));
+}
+
+void test_format_rfc3339_basic() {
+    // 2026-05-02T22:00:00Z = epoch 1777759200
+    char buf[32];
+    size_t n = formatRFC3339(1777759200, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("2026-05-02T22:00:00Z", buf);
+    TEST_ASSERT_EQUAL(20, n);
+}
+
+void test_format_rfc3339_epoch_zero() {
+    char buf[32];
+    formatRFC3339(0, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("1970-01-01T00:00:00Z", buf);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_stable_detector_empty_is_not_stable);
@@ -106,5 +142,11 @@ int main(int, char**) {
     RUN_TEST(test_scale_factor_from_mean);
     RUN_TEST(test_error_pct_basic);
     RUN_TEST(test_error_pct_zero_expected_returns_neg_one);
+    RUN_TEST(test_keep_alive_future_is_valid);
+    RUN_TEST(test_keep_alive_small_skew_past_is_valid);
+    RUN_TEST(test_keep_alive_large_past_is_invalid);
+    RUN_TEST(test_keep_alive_zero_is_invalid);
+    RUN_TEST(test_format_rfc3339_basic);
+    RUN_TEST(test_format_rfc3339_epoch_zero);
     return UNITY_END();
 }

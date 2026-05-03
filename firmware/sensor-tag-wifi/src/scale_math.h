@@ -28,3 +28,11 @@ double scaleFactorFromMean(const int32_t* samples, uint8_t n, int64_t off, doubl
 
 /// |measured - expected| / |expected| * 100. Returns -1.0 if expected == 0.
 double errorPct(double measured, double expected);
+
+/// Returns true if keep_alive_until is in the future, OR within
+/// CLOCK_SKEW_TOLERANCE_SEC of `now` (handles iOS clock drift).
+bool isKeepAliveValid(int64_t keep_alive_until, int64_t now);
+
+/// Format `epoch` (seconds) as RFC3339 UTC: "YYYY-MM-DDTHH:MM:SSZ".
+/// Returns number of bytes written (excl null terminator), 0 on overflow.
+size_t formatRFC3339(int64_t epoch, char* buf, size_t bufsz);
