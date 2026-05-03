@@ -11,12 +11,27 @@ void StableDetector::push(int32_t raw) {
 
 bool StableDetector::isStable() const {
     if (count_ < HX711_STABLE_WINDOW_LEN) return false;
-    int32_t mn = ring_[0], mx = ring_[0];
-    for (uint8_t i = 1; i < HX711_STABLE_WINDOW_LEN; i++) {
-        mn = std::min(mn, ring_[i]);
-        mx = std::max(mx, ring_[i]);
+
+    // Compute median of the window
+    int32_t sorted[HX711_STABLE_WINDOW_LEN];
+    for (uint8_t i = 0; i < HX711_STABLE_WINDOW_LEN; i++) sorted[i] = ring_[i];
+    std::sort(sorted, sorted + HX711_STABLE_WINDOW_LEN);
+    // For even N: average of two middle elements
+    int64_t med2 = static_cast<int64_t>(sorted[HX711_STABLE_WINDOW_LEN / 2 - 1]) +
+                   static_cast<int64_t>(sorted[HX711_STABLE_WINDOW_LEN / 2]);
+
+    // Compute absolute deviations from median (scaled by 2 to avoid fractional median)
+    int32_t devs[HX711_STABLE_WINDOW_LEN];
+    for (uint8_t i = 0; i < HX711_STABLE_WINDOW_LEN; i++) {
+        int64_t diff = 2LL * static_cast<int64_t>(ring_[i]) - med2;
+        devs[i] = static_cast<int32_t>(diff < 0 ? -diff : diff);
     }
-    return (mx - mn) <= HX711_STABLE_TOLERANCE_RAW;
+    std::sort(devs, devs + HX711_STABLE_WINDOW_LEN);
+    // MAD (scaled by 2) = median of |sample - median| * 2
+    int64_t mad2 = static_cast<int64_t>(devs[HX711_STABLE_WINDOW_LEN / 2 - 1]) +
+                   static_cast<int64_t>(devs[HX711_STABLE_WINDOW_LEN / 2]);
+    // Stable if MAD <= tolerance (both scaled by 2, so compare mad2 <= tolerance*2)
+    return mad2 <= static_cast<int64_t>(HX711_STABLE_TOLERANCE_RAW) * 2;
 }
 
 void StableDetector::reset() {

@@ -18,42 +18,57 @@ void test_stable_detector_partial_fill_is_not_stable() {
 
 void test_stable_detector_quiet_window_is_stable() {
     StableDetector d;
-    for (int i = 0; i < 5; i++) d.push(1000);
+    for (int i = 0; i < HX711_STABLE_WINDOW_LEN; i++) d.push(1000);
     TEST_ASSERT_TRUE(d.isStable());
 }
 
 void test_stable_detector_within_tolerance_is_stable() {
+    // Fill window with values whose MAD is well within tolerance
     StableDetector d;
-    d.push(1000);
-    d.push(1020);
-    d.push(1010);
-    d.push(990);
-    d.push(1015);  // range = 1020 - 990 = 30, < HX711_STABLE_TOLERANCE_RAW (50)
+    for (int i = 0; i < HX711_STABLE_WINDOW_LEN; i++) d.push(1000 + (i % 3) * 10);
+    // deviations are small; MAD << HX711_STABLE_TOLERANCE_RAW (200)
     TEST_ASSERT_TRUE(d.isStable());
 }
 
 void test_stable_detector_outside_tolerance_is_unstable() {
     StableDetector d;
-    d.push(1000);
-    d.push(1020);
-    d.push(1010);
-    d.push(990);
-    d.push(1100);  // range = 1100 - 990 = 110, > 50
+    // Alternate between 1000 and 2000 — MAD = 500, >> HX711_STABLE_TOLERANCE_RAW (200)
+    for (int i = 0; i < HX711_STABLE_WINDOW_LEN; i++) d.push(i % 2 == 0 ? 1000 : 2000);
     TEST_ASSERT_FALSE(d.isStable());
 }
 
 void test_stable_detector_recovers_after_disturbance() {
+    // After a sustained disturbance (fills the whole window) the detector becomes
+    // unstable during the transition, then recovers once stable samples refill it.
     StableDetector d;
-    for (int i = 0; i < 5; i++) d.push(1000);
-    d.push(1500);  // one disturbance
+    const int W = HX711_STABLE_WINDOW_LEN;
+    for (int i = 0; i < W; i++) d.push(1000);
+    // Monotonic drift large enough that MAD >> tolerance during transition
+    for (int i = 0; i < W; i++) d.push(1000 + (i + 1) * 300);
     TEST_ASSERT_FALSE(d.isStable());
-    d.push(1000);
-    d.push(1000);
-    d.push(1000);
-    d.push(1000);  // ring buffer is now [1500, 1000, 1000, 1000, 1000] — range 500
-    TEST_ASSERT_FALSE(d.isStable());
-    d.push(1000);  // ring is now [1000, 1000, 1000, 1000, 1000] — stable
+    // Flush all drifted samples out with quiet ones
+    for (int i = 0; i < W; i++) d.push(1000);
     TEST_ASSERT_TRUE(d.isStable());
+}
+
+void test_stable_detector_outlier_rejection() {
+    // 9 samples at 1000, 1 spike at 5000 — MAD should still be stable
+    StableDetector d;
+    const int W = HX711_STABLE_WINDOW_LEN;
+    // Fill with W-1 quiet samples then add spike, then fill rest quietly
+    for (int i = 0; i < W - 1; i++) d.push(1000);
+    d.push(5000);  // spike at end of window
+    // For window=10: 9× 1000 + 1× 5000 — median=1000, MAD=0 ← stable
+    TEST_ASSERT_TRUE(d.isStable());
+}
+
+void test_stable_detector_drift_unstable() {
+    // Monotonic increase — MAD picks up the trend, should be unstable
+    StableDetector d;
+    const int W = HX711_STABLE_WINDOW_LEN;
+    for (int i = 0; i < W; i++) d.push(1000 + i * 100);  // 1000, 1100, ..., 1000+(W-1)*100
+    // With W=10: 1000..1900, median≈1450, MADs are all ≥250 → unstable
+    TEST_ASSERT_FALSE(d.isStable());
 }
 
 void test_apply_calibration_basic() {
@@ -136,6 +151,8 @@ int main(int, char**) {
     RUN_TEST(test_stable_detector_within_tolerance_is_stable);
     RUN_TEST(test_stable_detector_outside_tolerance_is_unstable);
     RUN_TEST(test_stable_detector_recovers_after_disturbance);
+    RUN_TEST(test_stable_detector_outlier_rejection);
+    RUN_TEST(test_stable_detector_drift_unstable);
     RUN_TEST(test_apply_calibration_basic);
     RUN_TEST(test_apply_calibration_negative_load);
     RUN_TEST(test_tare_from_mean);
