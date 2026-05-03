@@ -410,6 +410,10 @@ bool ntpSynced() {
     return nowEpoch() > 1577836800;  // 2020-01-01 UTC
 }
 
+bool isCalibrated() {
+    return weight_scl_ != HX711_DEFAULT_SCALE_FACTOR;
+}
+
 bool inExtendedAwakeMode() {
     return extended_awake_;
 }
@@ -437,6 +441,7 @@ bool inExtendedAwakeMode() { return false; }
 int64_t keepAliveUntil() { return 0; }
 void onConnect() {}
 bool ntpSynced() { return true; }
+bool isCalibrated() { return false; }
 }
 
 #endif  // SENSOR_SCALE

@@ -15,7 +15,8 @@ bool inExtendedAwakeMode();
 int64_t keepAliveUntil();
 
 // Convenience for main.cpp
-void onConnect();   // subscribe + check retained config (1.5s grace window)
-bool ntpSynced();   // helper used to gate extended-awake entry
+void onConnect();       // subscribe + check retained config (1.5s grace window)
+bool ntpSynced();       // helper used to gate extended-awake entry
+bool isCalibrated();    // true when NVS scale factor differs from default
 
 }  // namespace Scale

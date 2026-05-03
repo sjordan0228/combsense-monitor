@@ -237,7 +237,7 @@ void uploadAndCheckOta(uint8_t batteryPct) {
             if (!MqttClient::publish(deviceId, r, sessionRssi)) break;
 
             // Dual-publish: also send dedicated weight topic for scale-aware consumers.
-            if (std::isfinite(r.weight_kg)) {
+            if (Scale::isCalibrated() && std::isfinite(r.weight_kg)) {
                 char weight_topic[80];
                 char weight_payload[16];
                 snprintf(weight_topic,   sizeof(weight_topic),
@@ -290,7 +290,8 @@ void sampleAndEnqueue() {
     int32_t scale_raw = 0;
     double  scale_kg  = NAN;
     Scale::sample(scale_raw, scale_kg);
-    r.weight_kg = static_cast<float>(scale_kg);  // NaN if sample failed; payload omits the field
+    // Only record weight if the scale has been calibrated; NaN causes payload to omit the field.
+    r.weight_kg = Scale::isCalibrated() ? static_cast<float>(scale_kg) : NAN;
 
     // System clock is set by drainBuffer()'s NTP sync and persists across deep
     // sleep. Samples taken before the first successful upload are tagged 0 and
