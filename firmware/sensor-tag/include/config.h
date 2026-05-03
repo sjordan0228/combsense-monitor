@@ -3,11 +3,21 @@
 #include <cstdint>
 
 // =============================================================================
-// Pin Definitions — Seeed XIAO ESP32C6
+// Pin Definitions — defaults match XIAO ESP32-C6 silkscreen.
+// Override at build time via -DPIN_I2C_SDA=N / -DPIN_I2C_SCL=N for other
+// boards (Adafruit Feather S3, Freenove S3 Lite). Battery monitor uses
+// the board-specific Arduino `A0` macro by default.
 // =============================================================================
 
-constexpr uint8_t PIN_I2C_SDA = 4;   // D4
-constexpr uint8_t PIN_I2C_SCL = 5;   // D5
+#ifndef PIN_I2C_SDA_GPIO
+#define PIN_I2C_SDA_GPIO 4   // XIAO C6 D4
+#endif
+#ifndef PIN_I2C_SCL_GPIO
+#define PIN_I2C_SCL_GPIO 5   // XIAO C6 D5
+#endif
+
+constexpr uint8_t PIN_I2C_SDA = PIN_I2C_SDA_GPIO;
+constexpr uint8_t PIN_I2C_SCL = PIN_I2C_SCL_GPIO;
 
 // =============================================================================
 // BLE Advertisement
