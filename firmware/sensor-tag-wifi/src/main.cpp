@@ -23,7 +23,14 @@
 
 namespace {
 
-RTC_DATA_ATTR uint16_t rtcSampleCounter = 0;
+RTC_DATA_ATTR uint16_t  rtcSampleCounter   = 0;
+
+/// Persists the epoch of the most recent cold-boot NTP sync across deep sleep.
+/// Set once (on the first upload wake after a cold boot) and held until the
+/// next cold boot resets it.  Zero means "not yet synced".
+RTC_DATA_ATTR int64_t   rtcLastBootEpoch   = 0;
+RTC_DATA_ATTR uint32_t  rtcLastBootMagic   = 0;
+constexpr uint32_t      LAST_BOOT_MAGIC    = 0xCB50B001u;
 
 uint8_t lastBatteryPct = 0;
 
@@ -244,8 +251,9 @@ void sampleAndEnqueue();
 /// Drain readings over MQTT and run the OTA check inside a single WiFi window.
 /// OTA must share the radio session with MQTT — a separate connect after
 /// disconnect leaves a window where WiFi.mode(OFF) makes esp_http_client fail.
-/// bootEpoch: epoch second of cold boot (0 if NTP not yet synced).
-void uploadAndCheckOta(uint8_t batteryPct, int64_t bootEpoch) {
+/// Uses rtcLastBootEpoch (set once on first post-cold-boot NTP sync) for
+/// capabilities.last_boot_ts per contract §3.1.
+void uploadAndCheckOta(uint8_t batteryPct) {
     if (!WifiManager::connect()) {
         Serial.println("[MAIN] no wifi — keeping buffer, skipping OTA");
         // Still sample so the reading goes into the buffer for next-wake retry.
@@ -256,6 +264,19 @@ void uploadAndCheckOta(uint8_t batteryPct, int64_t bootEpoch) {
     // Sync the RTC clock on every upload cycle. SNTP state persists across
     // deep sleep once set, so subsequent samples get real timestamps.
     WifiManager::getUnixTime();
+
+    // Record cold-boot epoch on the first wake after a cold boot where NTP
+    // succeeds.  rtcLastBootMagic guards against stale RTC memory.
+    if (rtcLastBootEpoch == 0 || rtcLastBootMagic != LAST_BOOT_MAGIC) {
+        time_t now = 0;
+        time(&now);
+        if (now > 1700000000) {
+            rtcLastBootEpoch = static_cast<int64_t>(now);
+            rtcLastBootMagic = LAST_BOOT_MAGIC;
+            Serial.printf("[MAIN] cold-boot epoch set: %lld\n",
+                          static_cast<long long>(rtcLastBootEpoch));
+        }
+    }
 
     // Connect MQTT regardless of buffer state — we still want to drain
     // any retained config messages even if there are no readings to send.
@@ -287,7 +308,9 @@ void uploadAndCheckOta(uint8_t batteryPct, int64_t bootEpoch) {
         sampleAndEnqueue();
 
         // Publish capabilities with post-apply feature flag state.
-        if (!Capabilities::publish(bootEpoch)) Serial.println("[CAP] publish failed");
+        // rtcLastBootEpoch is 0 until the first NTP-confirmed cold-boot wake;
+        // capabilities.buildPayload converts 0 → sentinel "1970-01-01T00:00:00Z".
+        if (!Capabilities::publish(rtcLastBootEpoch)) Serial.println("[CAP] publish failed");
 
         // Now drain readings.
         uint8_t sent = 0;
@@ -407,19 +430,21 @@ void setup() {
 
     Scale::init();
 
-    // Capture boot epoch now (post-NTP-attempt inside WifiManager::getUnixTime on
-    // first upload). On non-upload cycles this is 0 — capabilities not published.
-    int64_t bootEpoch = 0;
+    // On cold boot, invalidate rtcLastBootEpoch so uploadAndCheckOta sets it
+    // fresh after the first successful NTP sync.
     {
-        time_t t = 0;
-        time(&t);
-        bootEpoch = (t > 1700000000) ? static_cast<int64_t>(t) : 0;
+        esp_reset_reason_t reason = esp_reset_reason();
+        bool coldBoot = (reason != ESP_RST_DEEPSLEEP) || (rtcLastBootMagic != LAST_BOOT_MAGIC);
+        if (coldBoot) {
+            rtcLastBootEpoch = 0;
+            rtcLastBootMagic = 0;
+        }
     }
 
     rtcSampleCounter++;
 
     if (rtcSampleCounter >= cfg.uploadEveryN) {
-        uploadAndCheckOta(lastBatteryPct, bootEpoch);
+        uploadAndCheckOta(lastBatteryPct);
         rtcSampleCounter = 0;
     } else {
         // Non-upload cycle: still sample and buffer; no MQTT/capabilities.
