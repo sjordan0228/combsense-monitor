@@ -10,11 +10,20 @@
 #ifdef ARDUINO
 #include "mqtt_client.h"
 #else
-// Native build stubs
+// Native build stubs (TU-internal — `static` is deliberate for stub clarity).
+#include <cstdio>
 namespace MqttClient {
     static const char* getDeviceId() { return "test0000"; }
     static bool publishRaw(const char*, const char*, bool) { return true; }
 }
+// Minimal Serial stub for native: forward to stdout so logs are visible in tests.
+namespace {
+struct SerialStub {
+    void println(const char* s) { puts(s); }
+    template<typename... Args>
+    void printf(const char* fmt, Args... args) { ::printf(fmt, args...); }
+} Serial;
+}  // namespace
 #ifndef FIRMWARE_VERSION
 #define FIRMWARE_VERSION "test"
 #endif
@@ -72,15 +81,22 @@ bool publish(int64_t bootEpoch) {
         Config::isEnabled("feat_mic")     ? 1 : 0,
     };
 
-    char payload[256];
+    char payload[384];
     size_t len = buildPayload(flags, bootEpoch, payload, sizeof(payload));
-    if (len == 0 || len >= sizeof(payload)) return false;
+    if (len == 0 || len >= sizeof(payload)) {
+        Serial.println("[CAP] buildPayload overflow — payload buffer too small");
+        return false;
+    }
 
     char topic[96];
     snprintf(topic, sizeof(topic), "%s%s/capabilities",
              MQTT_TOPIC_PREFIX, MqttClient::getDeviceId());
 
-    return MqttClient::publishRaw(topic, payload, /*retained=*/true);
+    bool ok = MqttClient::publishRaw(topic, payload, /*retained=*/true);
+    if (!ok) {
+        Serial.printf("[MQTT] publishRaw failed topic=%s\n", topic);
+    }
+    return ok;
 }
 
 }  // namespace Capabilities

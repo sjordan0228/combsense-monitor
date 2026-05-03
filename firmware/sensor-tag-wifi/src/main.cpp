@@ -71,7 +71,17 @@ WakeCfg loadConfig() {
 /// differ from what's already stored — preserves idempotency for retained
 /// MQTT messages. Populates `applied` and `currentState` with the post-
 /// write view, used by the ack message.
+// PR-2 will expand result strings to `category:detail` format (e.g.
+// "invalid:range", "excluded:security"). PR-1 uses "ok" / "unknown_key".
+struct AckEntry {
+    char key[16];
+    char result[32];   // "ok", "unchanged", "unknown_key", "excluded:...", "invalid:...", "conflict:..."
+};
+
 struct AckSummary {
+    uint8_t  numEntries;
+    AckEntry entries[ConfigParser::MAX_REJECTED_KEYS * 2];  // applied + rejected
+    // Legacy fast-path counts for buildAckJson; updated by appendApplied/appendRejected.
     uint8_t numApplied;
     char    applied[ConfigParser::MAX_REJECTED_KEYS][ConfigParser::REJECTED_KEY_LEN];
 };
@@ -81,6 +91,31 @@ void appendApplied(AckSummary& s, const char* key) {
     strncpy(s.applied[s.numApplied], key, ConfigParser::REJECTED_KEY_LEN - 1);
     s.applied[s.numApplied][ConfigParser::REJECTED_KEY_LEN - 1] = '\0';
     s.numApplied += 1;
+
+    // Also record in unified AckEntry array for PR-2.
+    if (s.numEntries < sizeof(s.entries) / sizeof(s.entries[0])) {
+        strncpy(s.entries[s.numEntries].key,    key, sizeof(s.entries[0].key)    - 1);
+        strncpy(s.entries[s.numEntries].result, "ok", sizeof(s.entries[0].result) - 1);
+        s.entries[s.numEntries].key[sizeof(s.entries[0].key) - 1] = '\0';
+        s.entries[s.numEntries].result[sizeof(s.entries[0].result) - 1] = '\0';
+        s.numEntries++;
+    }
+}
+
+/// Check an NVS put return value; on failure log and move the key to rejected.
+/// Returns true if write succeeded, false on NVS write failure.
+static bool checkNvsWrite(AckSummary& s, size_t bytesWritten, const char* key) {
+    if (bytesWritten > 0) return true;
+    Serial.printf("[CONFIG] NVS write failed for key=%s\n", key);
+    // Record as a rejected entry.
+    if (s.numEntries < sizeof(s.entries) / sizeof(s.entries[0])) {
+        strncpy(s.entries[s.numEntries].key,    key,          sizeof(s.entries[0].key)    - 1);
+        strncpy(s.entries[s.numEntries].result, "invalid:nvs", sizeof(s.entries[0].result) - 1);
+        s.entries[s.numEntries].key[sizeof(s.entries[0].key) - 1] = '\0';
+        s.entries[s.numEntries].result[sizeof(s.entries[0].result) - 1] = '\0';
+        s.numEntries++;
+    }
+    return false;
 }
 
 AckSummary applyConfigToNvs(const ConfigParser::ConfigUpdate& u) {
@@ -91,35 +126,42 @@ AckSummary applyConfigToNvs(const ConfigParser::ConfigUpdate& u) {
     if (u.has_sample_int) {
         uint16_t cur = prefs.getUShort(NVS_KEY_SAMPLE_INT, DEFAULT_SAMPLE_INTERVAL_SEC);
         if (cur != u.sample_int) {
-            prefs.putUShort(NVS_KEY_SAMPLE_INT, u.sample_int);
-            appendApplied(s, "sample_int");
+            size_t written = prefs.putUShort(NVS_KEY_SAMPLE_INT, u.sample_int);
+            if (checkNvsWrite(s, written, "sample_int")) {
+                appendApplied(s, "sample_int");
+            }
         }
     }
     if (u.has_upload_every) {
         uint8_t cur = prefs.getUChar(NVS_KEY_UPLOAD_EVERY, DEFAULT_UPLOAD_EVERY_N);
         if (cur != u.upload_every) {
-            prefs.putUChar(NVS_KEY_UPLOAD_EVERY, u.upload_every);
-            appendApplied(s, "upload_every");
+            size_t written = prefs.putUChar(NVS_KEY_UPLOAD_EVERY, u.upload_every);
+            if (checkNvsWrite(s, written, "upload_every")) {
+                appendApplied(s, "upload_every");
+            }
         }
     }
     if (u.has_tag_name) {
         String cur = prefs.getString(NVS_KEY_TAG_NAME, "");
         if (cur != u.tag_name) {
-            prefs.putString(NVS_KEY_TAG_NAME, u.tag_name);
-            appendApplied(s, "tag_name");
+            size_t written = prefs.putString(NVS_KEY_TAG_NAME, u.tag_name);
+            if (checkNvsWrite(s, written, "tag_name")) {
+                appendApplied(s, "tag_name");
+            }
         }
     }
     if (u.has_ota_host) {
         String cur = prefs.getString(NVS_KEY_OTA_HOST, OTA_DEFAULT_HOST);
         if (cur != u.ota_host) {
-            prefs.putString(NVS_KEY_OTA_HOST, u.ota_host);
-            appendApplied(s, "ota_host");
+            size_t written = prefs.putString(NVS_KEY_OTA_HOST, u.ota_host);
+            if (checkNvsWrite(s, written, "ota_host")) {
+                appendApplied(s, "ota_host");
+            }
         }
     }
 
     prefs.end();
-    return s;
-}
+    return s;}
 
 /// Build the ack message JSON. Reads current NVS to populate current_state
 /// (post-apply view).
@@ -190,7 +232,9 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
     char ackBody[384];
     size_t ackLen = buildAckJson(applied, parsed, ackBody, sizeof(ackBody));
     if (ackLen > 0 && ackLen < sizeof(ackBody)) {
-        MqttClient::publishRaw(ackTopic, ackBody, false);  // not retained
+        if (!MqttClient::publishRaw(ackTopic, ackBody, false)) {  // not retained
+            Serial.printf("[MQTT] publishRaw failed topic=%s\n", ackTopic);
+        }
     }
 }
 
@@ -243,7 +287,7 @@ void uploadAndCheckOta(uint8_t batteryPct, int64_t bootEpoch) {
         sampleAndEnqueue();
 
         // Publish capabilities with post-apply feature flag state.
-        Capabilities::publish(bootEpoch);
+        if (!Capabilities::publish(bootEpoch)) Serial.println("[CAP] publish failed");
 
         // Now drain readings.
         uint8_t sent = 0;
@@ -260,7 +304,9 @@ void uploadAndCheckOta(uint8_t batteryPct, int64_t bootEpoch) {
                          "combsense/hive/%s/weight", deviceId);
                 snprintf(weight_payload, sizeof(weight_payload),
                          "%.3f", static_cast<double>(r.weight_kg));
-                MqttClient::publishRaw(weight_topic, weight_payload, /*retained=*/false);
+                if (!MqttClient::publishRaw(weight_topic, weight_payload, /*retained=*/false)) {
+                    Serial.printf("[MQTT] publishRaw failed topic=%s\n", weight_topic);
+                }
             }
 
             RingBuffer::popOldest();
