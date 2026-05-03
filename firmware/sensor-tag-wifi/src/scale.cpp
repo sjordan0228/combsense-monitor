@@ -11,6 +11,7 @@
 #include <HX711.h>
 #include <Preferences.h>
 #include <ArduinoJson.h>
+#include <cmath>
 #include <cstring>
 #include <time.h>
 
@@ -65,6 +66,102 @@ void writeScaleToNvs(double scl) {
     prefs.putDouble(NVS_K_SCL, scl);
     prefs.end();
     weight_scl_ = scl;
+}
+
+}  // anonymous namespace
+
+namespace {
+
+void publishStatusEvent(const char* json) {
+    char topic[80];
+    snprintf(topic, sizeof(topic), "combsense/hive/%s/scale/status",
+             /* deviceId — main.cpp owns this; will pass in later */ "");
+    // Actual publish call deferred — wired in Task 13 when subscribe() is added.
+    // For now this is a stub — full wiring in main integration task.
+    (void)json; (void)topic;
+}
+
+bool readSamples(int32_t* out, uint8_t n) {
+    for (uint8_t i = 0; i < n; i++) {
+        if (!hx711.wait_ready_timeout(HX711_READ_TIMEOUT_MS)) return false;
+        out[i] = hx711.read();
+        stable_.push(out[i]);
+    }
+    return true;
+}
+
+void cmdTare() {
+    int32_t samples[HX711_TARE_SAMPLE_COUNT];
+    if (!readSamples(samples, HX711_TARE_SAMPLE_COUNT)) {
+        char buf[160];
+        serializeErrorEvent("hx711_unresponsive", "tare failed: no DOUT pulse",
+                            nowEpoch(), buf, sizeof(buf));
+        publishStatusEvent(buf);
+        return;
+    }
+    int64_t off = tareFromMean(samples, HX711_TARE_SAMPLE_COUNT);
+    writeOffsetToNvs(off);
+
+    char buf[160];
+    serializeTareSavedEvent(off, nowEpoch(), buf, sizeof(buf));
+    publishStatusEvent(buf);
+}
+
+void cmdCalibrate(double known_kg) {
+    int32_t samples[HX711_TARE_SAMPLE_COUNT];
+    if (!readSamples(samples, HX711_TARE_SAMPLE_COUNT)) {
+        char buf[160];
+        serializeErrorEvent("hx711_unresponsive", "calibrate failed: no DOUT pulse",
+                            nowEpoch(), buf, sizeof(buf));
+        publishStatusEvent(buf);
+        return;
+    }
+    double sf = scaleFactorFromMean(samples, HX711_TARE_SAMPLE_COUNT, weight_off_, known_kg);
+    if (std::fabs(sf) < HX711_CALIBRATE_MIN_FACTOR) {
+        char buf[200];
+        char detail[64];
+        snprintf(detail, sizeof(detail), "scale_factor=%.4f below threshold", sf);
+        serializeErrorEvent("calibrate_invalid", detail, nowEpoch(), buf, sizeof(buf));
+        publishStatusEvent(buf);
+        return;
+    }
+    writeScaleToNvs(sf);
+
+    // Stub predicted accuracy = sample stddev / mean * 100
+    int64_t sum = 0;
+    for (uint8_t i = 0; i < HX711_TARE_SAMPLE_COUNT; i++) sum += samples[i];
+    double mean = double(sum) / HX711_TARE_SAMPLE_COUNT;
+    double var = 0;
+    for (uint8_t i = 0; i < HX711_TARE_SAMPLE_COUNT; i++) {
+        double d = samples[i] - mean;
+        var += d * d;
+    }
+    double stddev = std::sqrt(var / HX711_TARE_SAMPLE_COUNT);
+    double predicted = (mean != 0.0) ? (stddev / std::fabs(mean) * 100.0) : 0.0;
+
+    char buf[200];
+    serializeCalibrationSavedEvent(sf, predicted, nowEpoch(), buf, sizeof(buf));
+    publishStatusEvent(buf);
+}
+
+void cmdVerify(double expected_kg) {
+    int32_t samples[HX711_VERIFY_SAMPLE_COUNT];
+    if (!readSamples(samples, HX711_VERIFY_SAMPLE_COUNT)) {
+        char buf[160];
+        serializeErrorEvent("hx711_unresponsive", "verify failed: no DOUT pulse",
+                            nowEpoch(), buf, sizeof(buf));
+        publishStatusEvent(buf);
+        return;
+    }
+    int64_t sum = 0;
+    for (uint8_t i = 0; i < HX711_VERIFY_SAMPLE_COUNT; i++) sum += samples[i];
+    int32_t avg = sum / HX711_VERIFY_SAMPLE_COUNT;
+    double measured = applyCalibration(avg, weight_off_, weight_scl_);
+    double err = errorPct(measured, expected_kg);
+
+    char buf[200];
+    serializeVerifyResultEvent(measured, expected_kg, err, nowEpoch(), buf, sizeof(buf));
+    publishStatusEvent(buf);
 }
 
 }  // anonymous namespace
