@@ -70,6 +70,28 @@ constexpr const char* NVS_KEY_UPLOAD_EVERY = "upload_every";
 constexpr uint16_t RTC_BUFFER_CAPACITY = 288;   // 24h @ 5-min cadence (288 × 28B = 8 KB of LP-SRAM)
 
 // =============================================================================
+// Feature flag compile-time defaults
+// =============================================================================
+
+#ifndef DEFAULT_FEAT_DS18B20
+#define DEFAULT_FEAT_DS18B20 1   // baseline temp sensor — on by default
+#endif
+#ifndef DEFAULT_FEAT_SHT31
+#define DEFAULT_FEAT_SHT31 0     // mutually exclusive with DS18B20 (validated in PR-2)
+#endif
+#ifndef DEFAULT_FEAT_SCALE
+#define DEFAULT_FEAT_SCALE 0     // off until user enables remotely
+#endif
+#ifndef DEFAULT_FEAT_MIC
+#define DEFAULT_FEAT_MIC 0       // off until user enables remotely
+#endif
+
+// Hardware board identifier — override per env via -DHW_BOARD=\"board-name\"
+#ifndef HW_BOARD
+#define HW_BOARD "unknown"
+#endif
+
+// =============================================================================
 // Sensors
 // =============================================================================
 
