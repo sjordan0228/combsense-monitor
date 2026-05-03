@@ -20,6 +20,7 @@
 #include "serial_console.h"
 #include "ota.h"
 #include "scale.h"
+#include "scale_math.h"
 #include <cmath>
 
 namespace {
@@ -75,130 +76,140 @@ WakeCfg loadConfig() {
     return c;
 }
 
-/// Apply a parsed config update to NVS. Only writes keys whose values
-/// differ from what's already stored — preserves idempotency for retained
-/// MQTT messages. Populates `applied` and `currentState` with the post-
-/// write view, used by the ack message.
-struct AckSummary {
-    uint8_t  numEntries;
-    AckEntry entries[ConfigParser::MAX_REJECTED_KEYS * 2];  // applied + rejected
-    // Legacy fast-path counts for buildAckJson; updated by appendApplied/appendRejected.
-    uint8_t numApplied;
-    char    applied[ConfigParser::MAX_REJECTED_KEYS][ConfigParser::REJECTED_KEY_LEN];
+/// Unified result from applyConfigToNvs.
+/// entries[] hold per-key AckEntry records (ok/unchanged/invalid:nvs).
+/// anyFeatChanged: true when at least one feat_* key was written (not unchanged).
+struct ApplyResult {
+    static constexpr size_t MAX = ConfigParser::MAX_REJECTED_KEYS * 2;
+    AckEntry entries[MAX];
+    size_t   numEntries     = 0;
+    bool     anyFeatChanged = false;
+    bool     anyFeatTouched = false;  // any feat_* key was processed at all
 };
 
-void appendApplied(AckSummary& s, const char* key) {
-    if (s.numApplied >= ConfigParser::MAX_REJECTED_KEYS) return;
-    strncpy(s.applied[s.numApplied], key, ConfigParser::REJECTED_KEY_LEN - 1);
-    s.applied[s.numApplied][ConfigParser::REJECTED_KEY_LEN - 1] = '\0';
-    s.numApplied += 1;
+namespace {
 
-    // Also record in unified AckEntry array for PR-2.
-    if (s.numEntries < sizeof(s.entries) / sizeof(s.entries[0])) {
-        strncpy(s.entries[s.numEntries].key,    key, sizeof(s.entries[0].key)    - 1);
-        strncpy(s.entries[s.numEntries].result, "ok", sizeof(s.entries[0].result) - 1);
-        s.entries[s.numEntries].key[sizeof(s.entries[0].key) - 1] = '\0';
-        s.entries[s.numEntries].result[sizeof(s.entries[0].result) - 1] = '\0';
-        s.numEntries++;
+void appendEntry(ApplyResult& r, const char* key, const char* result) {
+    if (r.numEntries >= ApplyResult::MAX) return;
+    AckEntry& e = r.entries[r.numEntries++];
+    strncpy(e.key,    key,    sizeof(e.key)    - 1); e.key[sizeof(e.key) - 1]       = '\0';
+    strncpy(e.result, result, sizeof(e.result) - 1); e.result[sizeof(e.result) - 1] = '\0';
+}
+
+/// Write a uint8 feat flag to NVS if the new value differs from current.
+/// Records "ok" on write, "unchanged" if same, "invalid:nvs" on write failure.
+void applyFeatFlag(Preferences& prefs, ApplyResult& r,
+                   const char* nvsKey, ConfigParser::FeatFlag flag,
+                   uint8_t defaultVal) {
+    uint8_t incoming = (flag == ConfigParser::FeatFlag::On) ? 1 : 0;
+    uint8_t cur      = prefs.getUChar(nvsKey, defaultVal);
+    r.anyFeatTouched = true;
+    if (cur == incoming) {
+        appendEntry(r, nvsKey, "unchanged");
+    } else {
+        size_t written = prefs.putUChar(nvsKey, incoming);
+        if (written > 0) {
+            appendEntry(r, nvsKey, "ok");
+            r.anyFeatChanged = true;
+        } else {
+            Serial.printf("[CONFIG] NVS write failed for key=%s\n", nvsKey);
+            appendEntry(r, nvsKey, "invalid:nvs");
+        }
     }
 }
 
-/// Check an NVS put return value; on failure log and move the key to rejected.
-/// Returns true if write succeeded, false on NVS write failure.
-static bool checkNvsWrite(AckSummary& s, size_t bytesWritten, const char* key) {
-    if (bytesWritten > 0) return true;
-    Serial.printf("[CONFIG] NVS write failed for key=%s\n", key);
-    // Record as a rejected entry.
-    if (s.numEntries < sizeof(s.entries) / sizeof(s.entries[0])) {
-        strncpy(s.entries[s.numEntries].key,    key,          sizeof(s.entries[0].key)    - 1);
-        strncpy(s.entries[s.numEntries].result, "invalid:nvs", sizeof(s.entries[0].result) - 1);
-        s.entries[s.numEntries].key[sizeof(s.entries[0].key) - 1] = '\0';
-        s.entries[s.numEntries].result[sizeof(s.entries[0].result) - 1] = '\0';
-        s.numEntries++;
-    }
-    return false;
-}
+}  // namespace
 
-AckSummary applyConfigToNvs(const ConfigParser::ConfigUpdate& u) {
-    AckSummary s {};
+/// Apply a parsed config update to NVS.
+///
+/// Per-key idempotency: if the new value matches NVS, records "unchanged"
+/// and skips the write (preserves idempotency for retained MQTT messages).
+///
+/// Returns an ApplyResult with per-key AckEntry records and a flag indicating
+/// whether any feat_* value actually changed (used to gate capabilities re-publish).
+ApplyResult applyConfigToNvs(const ConfigParser::ConfigUpdate& u) {
+    ApplyResult r {};
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);  // RW
 
     if (u.has_sample_int) {
         uint16_t cur = prefs.getUShort(NVS_KEY_SAMPLE_INT, DEFAULT_SAMPLE_INTERVAL_SEC);
-        if (cur != u.sample_int) {
+        if (cur == u.sample_int) {
+            appendEntry(r, "sample_int", "unchanged");
+        } else {
             size_t written = prefs.putUShort(NVS_KEY_SAMPLE_INT, u.sample_int);
-            if (checkNvsWrite(s, written, "sample_int")) {
-                appendApplied(s, "sample_int");
+            if (written > 0) {
+                appendEntry(r, "sample_int", "ok");
+            } else {
+                Serial.println("[CONFIG] NVS write failed for key=sample_int");
+                appendEntry(r, "sample_int", "invalid:nvs");
             }
         }
     }
     if (u.has_upload_every) {
         uint8_t cur = prefs.getUChar(NVS_KEY_UPLOAD_EVERY, DEFAULT_UPLOAD_EVERY_N);
-        if (cur != u.upload_every) {
+        if (cur == u.upload_every) {
+            appendEntry(r, "upload_every", "unchanged");
+        } else {
             size_t written = prefs.putUChar(NVS_KEY_UPLOAD_EVERY, u.upload_every);
-            if (checkNvsWrite(s, written, "upload_every")) {
-                appendApplied(s, "upload_every");
+            if (written > 0) {
+                appendEntry(r, "upload_every", "ok");
+            } else {
+                Serial.println("[CONFIG] NVS write failed for key=upload_every");
+                appendEntry(r, "upload_every", "invalid:nvs");
             }
         }
     }
     if (u.has_tag_name) {
         String cur = prefs.getString(NVS_KEY_TAG_NAME, "");
-        if (cur != u.tag_name) {
+        if (cur == u.tag_name) {
+            appendEntry(r, "tag_name", "unchanged");
+        } else {
             size_t written = prefs.putString(NVS_KEY_TAG_NAME, u.tag_name);
-            if (checkNvsWrite(s, written, "tag_name")) {
-                appendApplied(s, "tag_name");
+            if (written > 0) {
+                appendEntry(r, "tag_name", "ok");
+            } else {
+                Serial.println("[CONFIG] NVS write failed for key=tag_name");
+                appendEntry(r, "tag_name", "invalid:nvs");
             }
         }
     }
     if (u.has_ota_host) {
         String cur = prefs.getString(NVS_KEY_OTA_HOST, OTA_DEFAULT_HOST);
-        if (cur != u.ota_host) {
+        if (cur == u.ota_host) {
+            appendEntry(r, "ota_host", "unchanged");
+        } else {
             size_t written = prefs.putString(NVS_KEY_OTA_HOST, u.ota_host);
-            if (checkNvsWrite(s, written, "ota_host")) {
-                appendApplied(s, "ota_host");
+            if (written > 0) {
+                appendEntry(r, "ota_host", "ok");
+            } else {
+                Serial.println("[CONFIG] NVS write failed for key=ota_host");
+                appendEntry(r, "ota_host", "invalid:nvs");
             }
         }
     }
 
-    prefs.end();
-    return s;
-}
-
-/// Handle a /config/get request — returns current NVS state as JSON.
-/// PR-1 stub: logs and returns without publishing.  PR-2 will implement.
-void handleConfigGet(const char* /*topic*/) {
-    Serial.println("[CONFIG] /config/get not implemented in PR-1");
-}
-
-/// Build the ack message JSON. Reads current NVS to populate current_state
-/// (post-apply view).
-size_t buildAckJson(const AckSummary& applied,
-                    const ConfigParser::ConfigUpdate& parsed,
-                    char* out, size_t outCap) {
-    JsonDocument doc;
-
-    JsonArray arrApplied = doc["applied"].to<JsonArray>();
-    for (uint8_t i = 0; i < applied.numApplied; ++i) {
-        arrApplied.add(applied.applied[i]);
+    // feat_* flags — stored as UChar(0/1)
+    if (u.feat_ds18b20 != ConfigParser::FeatFlag::Absent) {
+        applyFeatFlag(prefs, r, "feat_ds18b20", u.feat_ds18b20, DEFAULT_FEAT_DS18B20);
+    }
+    if (u.feat_sht31 != ConfigParser::FeatFlag::Absent) {
+        applyFeatFlag(prefs, r, "feat_sht31", u.feat_sht31, DEFAULT_FEAT_SHT31);
+    }
+    if (u.feat_scale != ConfigParser::FeatFlag::Absent) {
+        applyFeatFlag(prefs, r, "feat_scale", u.feat_scale, DEFAULT_FEAT_SCALE);
+    }
+    if (u.feat_mic != ConfigParser::FeatFlag::Absent) {
+        applyFeatFlag(prefs, r, "feat_mic", u.feat_mic, DEFAULT_FEAT_MIC);
     }
 
-    JsonArray arrRejected = doc["rejected"].to<JsonArray>();
-    for (uint8_t i = 0; i < parsed.num_rejected; ++i) {
-        arrRejected.add(parsed.rejected[i]);
-    }
-
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, true);
-    JsonObject state = doc["current_state"].to<JsonObject>();
-    state["sample_int"]   = prefs.getUShort(NVS_KEY_SAMPLE_INT, DEFAULT_SAMPLE_INTERVAL_SEC);
-    state["upload_every"] = prefs.getUChar(NVS_KEY_UPLOAD_EVERY, DEFAULT_UPLOAD_EVERY_N);
-    state["tag_name"]     = prefs.getString(NVS_KEY_TAG_NAME, "");
-    state["ota_host"]     = prefs.getString(NVS_KEY_OTA_HOST, OTA_DEFAULT_HOST);
     prefs.end();
-
-    return serializeJson(doc, out, outCap);
+    return r;
 }
+
+/// Handle a /config/get request — returns current NVS state on config/state topic.
+/// Implemented in Block 5.
+void handleConfigGet(const char* topic, const uint8_t* payload, size_t len);
 
 /// Callback invoked by MqttClient::loop() when a message arrives on a
 /// subscribed topic.  Routes to the appropriate handler by topic suffix.
@@ -209,7 +220,7 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
         return;
     }
     if (strstr(topic, "/config/get")) {
-        handleConfigGet(topic);
+        handleConfigGet(topic, payload, len);
         return;
     }
     if (!strstr(topic, "/config")) {
@@ -220,6 +231,12 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
     // /config apply path.
     Serial.printf("[CONFIG] received %u bytes on %s\n",
                   static_cast<unsigned>(len), topic);
+
+    // Empty payload = firmware-side retain-clear signal (never from iOS).
+    if (len == 0) {
+        Serial.println("[CONFIG] empty payload — retain-clear signal, ignoring");
+        return;
+    }
 
     // Make a NUL-terminated copy for the parser.
     char body[256];
@@ -250,38 +267,195 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
         prefs.end();
     }
 
+    // Accumulate all per-key results in a single flat array for the rich ack.
+    // Capacity: preValidate entries + apply entries + parser-rejected entries.
+    constexpr size_t MAX_ACK = ApplyResult::MAX + ConfigParser::MAX_REJECTED_KEYS;
+    AckEntry allEntries[MAX_ACK];
+    size_t   numEntries = 0;
+
     AckEntry preValidEntries[ConfigParser::MAX_REJECTED_KEYS];
     size_t   preValidCount = 0;
-    if (!preValidate(parsed, tempNvsState, preValidEntries, &preValidCount)) {
+
+    bool applyAllowed = preValidate(parsed, tempNvsState, preValidEntries, &preValidCount);
+
+    if (!applyAllowed) {
+        // Collect conflict entries from preValidate for the ack.
+        for (size_t i = 0; i < preValidCount && numEntries < MAX_ACK; ++i) {
+            allEntries[numEntries++] = preValidEntries[i];
+        }
+        // Also add parser-rejected keys (unknown / invalid value).
+        for (uint8_t i = 0; i < parsed.num_rejected && numEntries < MAX_ACK; ++i) {
+            AckEntry& e = allEntries[numEntries++];
+            strncpy(e.key,    parsed.rejected[i], sizeof(e.key)    - 1); e.key[sizeof(e.key) - 1]       = '\0';
+            strncpy(e.result, "unknown_key",       sizeof(e.result) - 1); e.result[sizeof(e.result) - 1] = '\0';
+        }
         Serial.println("[CONFIG] preValidate rejected — aborting apply");
-        return;
-    }
+    } else {
+        ApplyResult applied = applyConfigToNvs(parsed);
+        Serial.printf("[CONFIG] numEntries=%u\n",
+                      static_cast<unsigned>(applied.numEntries));
 
-    AckSummary applied = applyConfigToNvs(parsed);
-    Serial.printf("[CONFIG] applied=%u rejected=%u\n",
-                  applied.numApplied, parsed.num_rejected);
+        // Merge apply results.
+        for (size_t i = 0; i < applied.numEntries && numEntries < MAX_ACK; ++i) {
+            allEntries[numEntries++] = applied.entries[i];
+        }
+        // Parser-rejected keys → "unknown_key" (they were not even attempted).
+        for (uint8_t i = 0; i < parsed.num_rejected && numEntries < MAX_ACK; ++i) {
+            AckEntry& e = allEntries[numEntries++];
+            strncpy(e.key,    parsed.rejected[i], sizeof(e.key)    - 1); e.key[sizeof(e.key) - 1]       = '\0';
+            strncpy(e.result, "unknown_key",       sizeof(e.result) - 1); e.result[sizeof(e.result) - 1] = '\0';
+        }
 
-    // §3.2: re-publish capabilities after any successful config apply so the
-    // backend sees the updated feat_* state immediately.  PR-2 will gate this
-    // on "did any feat_* key actually change"; for PR-1 it's unconditional and
-    // harmless (capabilities payload is identical when no feat_* keys changed).
-    if (applied.numApplied > 0) {
-        Serial.println("[CONFIG] re-publishing capabilities post-apply");
-        if (!Capabilities::publish(rtcLastBootEpoch)) {
-            Serial.println("[CAP] re-publish after config failed");
+        // §2: clear broker-side retain BEFORE publishing ack.
+        char configTopic[80];
+        snprintf(configTopic, sizeof(configTopic), "%s%s/config",
+                 MQTT_TOPIC_PREFIX, deviceId);
+        MqttClient::publishRaw(configTopic, "", /*retained=*/true);
+
+        // §3.2: re-publish capabilities only when a feat_* key was processed
+        // (any category — ok, unchanged, invalid, conflict) per the contract.
+        // "Touched" is the correct gate: even an unchanged feat_* flag confirms
+        // iOS's mental model of the capabilities state.
+        if (applied.anyFeatTouched) {
+            Serial.println("[CONFIG] re-publishing capabilities (feat_* touched)");
+            if (!Capabilities::publish(rtcLastBootEpoch)) {
+                Serial.println("[CAP] re-publish after config failed");
+            }
         }
     }
 
-    // Publish ack to `combsense/hive/<id>/config/ack`.
+    // §5.1: publish rich ack to `combsense/hive/<id>/config/ack`.
     char ackTopic[96];
     snprintf(ackTopic, sizeof(ackTopic), "%s%s/config/ack",
              MQTT_TOPIC_PREFIX, deviceId);
 
-    char ackBody[384];
-    size_t ackLen = buildAckJson(applied, parsed, ackBody, sizeof(ackBody));
+    time_t nowEpoch = 0;
+    time(&nowEpoch);
+
+    char ackBody[512];
+    size_t ackLen = buildRichAck(allEntries, numEntries,
+                                 static_cast<int64_t>(nowEpoch),
+                                 ackBody, sizeof(ackBody));
     if (ackLen > 0 && ackLen < sizeof(ackBody)) {
         if (!MqttClient::publishRaw(ackTopic, ackBody, false)) {  // not retained
             Serial.printf("[MQTT] publishRaw failed topic=%s\n", ackTopic);
+        }
+    }
+}
+
+/// Known config keys that can be returned by config/get → config/state.
+/// Excluded-by-policy keys (wifi_pass, mqtt_pass) are absent from this list
+/// and will never be returned, even if explicitly requested in the `keys` filter.
+struct KnownConfigKey {
+    const char* name;
+    enum class Type { UShort, UChar, String } type;
+    union Default {
+        uint16_t u16;
+        uint8_t  u8;
+        const char* str;
+    } def;
+};
+
+static const KnownConfigKey KNOWN_CONFIG_KEYS[] = {
+    { "feat_ds18b20",  KnownConfigKey::Type::UChar,   { .u8  = DEFAULT_FEAT_DS18B20         } },
+    { "feat_sht31",    KnownConfigKey::Type::UChar,   { .u8  = DEFAULT_FEAT_SHT31            } },
+    { "feat_scale",    KnownConfigKey::Type::UChar,   { .u8  = DEFAULT_FEAT_SCALE            } },
+    { "feat_mic",      KnownConfigKey::Type::UChar,   { .u8  = DEFAULT_FEAT_MIC              } },
+    { "sample_int",    KnownConfigKey::Type::UShort,  { .u16 = DEFAULT_SAMPLE_INTERVAL_SEC  } },
+    { "upload_every",  KnownConfigKey::Type::UChar,   { .u8  = DEFAULT_UPLOAD_EVERY_N        } },
+    { "tag_name",      KnownConfigKey::Type::String,  { .str = ""                            } },
+    { "ota_host",      KnownConfigKey::Type::String,  { .str = OTA_DEFAULT_HOST              } },
+};
+static constexpr size_t NUM_KNOWN_CONFIG_KEYS =
+    sizeof(KNOWN_CONFIG_KEYS) / sizeof(KNOWN_CONFIG_KEYS[0]);
+
+/// Handle a /config/get request per contract §7.
+///
+/// Empty payload → return all known keys.
+/// {"keys":["sample_int","feat_scale"]} → return only the listed keys that
+/// exist in the allowed set (excluded-by-policy keys silently omitted).
+///
+/// Response published to combsense/hive/<id>/config/state (retain=false).
+void handleConfigGet(const char* /*topic*/, const uint8_t* payload, size_t len) {
+    // Build the set of keys to return.  Default: all known keys.
+    // If the payload is non-empty JSON with a "keys" array, filter to that subset.
+    bool includeAll = true;
+    char requestedKeys[NUM_KNOWN_CONFIG_KEYS][16] = {};
+    size_t numRequested = 0;
+
+    if (len > 0) {
+        char body[256];
+        if (len < sizeof(body)) {
+            memcpy(body, payload, len);
+            body[len] = '\0';
+            JsonDocument req;
+            if (deserializeJson(req, body) == DeserializationError::Ok) {
+                JsonArray keysArr = req["keys"].as<JsonArray>();
+                if (!keysArr.isNull()) {
+                    includeAll = false;
+                    for (JsonVariant v : keysArr) {
+                        const char* k = v.as<const char*>();
+                        if (k && numRequested < NUM_KNOWN_CONFIG_KEYS) {
+                            strncpy(requestedKeys[numRequested], k,
+                                    sizeof(requestedKeys[0]) - 1);
+                            requestedKeys[numRequested][sizeof(requestedKeys[0]) - 1] = '\0';
+                            numRequested++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    auto shouldInclude = [&](const char* name) -> bool {
+        if (includeAll) return true;
+        for (size_t i = 0; i < numRequested; ++i) {
+            if (strcmp(requestedKeys[i], name) == 0) return true;
+        }
+        return false;
+    };
+
+    // Read NVS values and build response JSON.
+    JsonDocument doc;
+    doc["event"] = "config_state";
+    JsonObject values = doc["values"].to<JsonObject>();
+
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    for (size_t i = 0; i < NUM_KNOWN_CONFIG_KEYS; ++i) {
+        const KnownConfigKey& k = KNOWN_CONFIG_KEYS[i];
+        if (!shouldInclude(k.name)) continue;
+        switch (k.type) {
+            case KnownConfigKey::Type::UShort:
+                values[k.name] = prefs.getUShort(k.name, k.def.u16);
+                break;
+            case KnownConfigKey::Type::UChar:
+                values[k.name] = prefs.getUChar(k.name, k.def.u8);
+                break;
+            case KnownConfigKey::Type::String:
+                values[k.name] = prefs.getString(k.name, k.def.str);
+                break;
+        }
+    }
+    prefs.end();
+
+    char tsBuf[22] = {};
+    time_t nowEpoch = 0;
+    time(&nowEpoch);
+    if (nowEpoch <= 0 || formatRFC3339(static_cast<int64_t>(nowEpoch), tsBuf, sizeof(tsBuf)) == 0) {
+        strncpy(tsBuf, "1970-01-01T00:00:00Z", sizeof(tsBuf) - 1);
+    }
+    doc["ts"] = tsBuf;
+
+    char stateTopic[96];
+    snprintf(stateTopic, sizeof(stateTopic), "%s%s/config/state",
+             MQTT_TOPIC_PREFIX, deviceId);
+
+    char buf[512];
+    size_t n = serializeJson(doc, buf, sizeof(buf));
+    if (n > 0 && n < sizeof(buf)) {
+        if (!MqttClient::publishRaw(stateTopic, buf, /*retained=*/false)) {
+            Serial.printf("[MQTT] publishRaw failed topic=%s\n", stateTopic);
         }
     }
 }

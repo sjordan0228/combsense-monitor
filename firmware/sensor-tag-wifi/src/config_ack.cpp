@@ -1,5 +1,7 @@
 #include "config_ack.h"
+#include "scale_math.h"
 
+#include <ArduinoJson.h>
 #include <cstring>
 
 using ConfigParser::FeatFlag;
@@ -23,6 +25,26 @@ static void appendEntry(AckEntry* entries, size_t* count,
 }
 
 }  // namespace
+
+size_t buildRichAck(const AckEntry* entries, size_t numEntries,
+                    int64_t nowEpoch,
+                    char* out, size_t outCap) {
+    JsonDocument doc;
+    doc["event"] = "config_applied";
+
+    JsonObject results = doc["results"].to<JsonObject>();
+    for (size_t i = 0; i < numEntries; ++i) {
+        results[entries[i].key] = entries[i].result;
+    }
+
+    char tsBuf[22] = {};
+    if (nowEpoch <= 0 || formatRFC3339(nowEpoch, tsBuf, sizeof(tsBuf)) == 0) {
+        strncpy(tsBuf, "1970-01-01T00:00:00Z", sizeof(tsBuf) - 1);
+    }
+    doc["ts"] = tsBuf;
+
+    return serializeJson(doc, out, outCap);
+}
 
 bool preValidate(const ConfigParser::ConfigUpdate& parsed,
                  const TemperatureNvsState& nvsState,

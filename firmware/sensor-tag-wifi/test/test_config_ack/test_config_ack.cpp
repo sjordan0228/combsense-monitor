@@ -1,5 +1,6 @@
 #include <unity.h>
 #include <cstring>
+#include <ArduinoJson.h>
 #include "config_ack.h"
 #include "config_parser.h"
 
@@ -161,6 +162,77 @@ void test_preValidate_rejects_one_key_against_existing() {
     TEST_ASSERT_EQUAL_size_t(2u, count);
 }
 
+// --- buildRichAck ------------------------------------------------------------
+
+void test_ack_rich_format_serializes() {
+    AckEntry entries[3];
+    strncpy(entries[0].key,    "feat_scale",  sizeof(entries[0].key)    - 1); entries[0].key[sizeof(entries[0].key) - 1] = '\0';
+    strncpy(entries[0].result, "ok",          sizeof(entries[0].result) - 1); entries[0].result[sizeof(entries[0].result) - 1] = '\0';
+    strncpy(entries[1].key,    "sample_int",  sizeof(entries[1].key)    - 1); entries[1].key[sizeof(entries[1].key) - 1] = '\0';
+    strncpy(entries[1].result, "unchanged",   sizeof(entries[1].result) - 1); entries[1].result[sizeof(entries[1].result) - 1] = '\0';
+    strncpy(entries[2].key,    "feat_sht31",  sizeof(entries[2].key)    - 1); entries[2].key[sizeof(entries[2].key) - 1] = '\0';
+    strncpy(entries[2].result, "conflict:feat_ds18b20", sizeof(entries[2].result) - 1); entries[2].result[sizeof(entries[2].result) - 1] = '\0';
+
+    char buf[512];
+    size_t n = buildRichAck(entries, 3, 1714780800LL, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0u, n);
+
+    JsonDocument doc;
+    auto err = deserializeJson(doc, buf, n);
+    TEST_ASSERT_EQUAL_INT(0, (int)err.code());
+
+    TEST_ASSERT_EQUAL_STRING("config_applied", doc["event"].as<const char*>());
+    TEST_ASSERT_EQUAL_STRING("ok",             doc["results"]["feat_scale"].as<const char*>());
+    TEST_ASSERT_EQUAL_STRING("unchanged",      doc["results"]["sample_int"].as<const char*>());
+    TEST_ASSERT_EQUAL_STRING("conflict:feat_ds18b20", doc["results"]["feat_sht31"].as<const char*>());
+    TEST_ASSERT_FALSE(doc["ts"].isNull());
+}
+
+void test_ack_rich_format_includes_ts_rfc3339() {
+    // 1714780800 → "2024-05-04T00:00:00Z"
+    AckEntry entries[1];
+    strncpy(entries[0].key,    "feat_scale", sizeof(entries[0].key)    - 1); entries[0].key[sizeof(entries[0].key) - 1] = '\0';
+    strncpy(entries[0].result, "ok",         sizeof(entries[0].result) - 1); entries[0].result[sizeof(entries[0].result) - 1] = '\0';
+    char buf[256];
+    size_t n = buildRichAck(entries, 1, 1714780800LL, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0u, n);
+    JsonDocument doc;
+    deserializeJson(doc, buf, n);
+    TEST_ASSERT_EQUAL_STRING("2024-05-04T00:00:00Z", doc["ts"].as<const char*>());
+}
+
+void test_ack_rich_format_zero_epoch_emits_sentinel() {
+    AckEntry entries[1];
+    strncpy(entries[0].key,    "sample_int", sizeof(entries[0].key)    - 1); entries[0].key[sizeof(entries[0].key) - 1] = '\0';
+    strncpy(entries[0].result, "ok",         sizeof(entries[0].result) - 1); entries[0].result[sizeof(entries[0].result) - 1] = '\0';
+    char buf[256];
+    size_t n = buildRichAck(entries, 1, 0LL, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0u, n);
+    JsonDocument doc;
+    deserializeJson(doc, buf, n);
+    TEST_ASSERT_EQUAL_STRING("1970-01-01T00:00:00Z", doc["ts"].as<const char*>());
+}
+
+void test_unchanged_category_serializes_in_rich_ack() {
+    // Simulate a no-op apply: same value passed twice would produce "unchanged".
+    // This verifies the "unchanged" category serializes correctly in the ack.
+    AckEntry entries[2];
+    strncpy(entries[0].key,    "feat_scale",  sizeof(entries[0].key)    - 1); entries[0].key[sizeof(entries[0].key) - 1] = '\0';
+    strncpy(entries[0].result, "unchanged",   sizeof(entries[0].result) - 1); entries[0].result[sizeof(entries[0].result) - 1] = '\0';
+    strncpy(entries[1].key,    "sample_int",  sizeof(entries[1].key)    - 1); entries[1].key[sizeof(entries[1].key) - 1] = '\0';
+    strncpy(entries[1].result, "unchanged",   sizeof(entries[1].result) - 1); entries[1].result[sizeof(entries[1].result) - 1] = '\0';
+
+    char buf[256];
+    size_t n = buildRichAck(entries, 2, 1714780800LL, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0u, n);
+    JsonDocument doc;
+    auto err = deserializeJson(doc, buf, n);
+    TEST_ASSERT_EQUAL_INT(0, (int)err.code());
+    TEST_ASSERT_EQUAL_STRING("unchanged", doc["results"]["feat_scale"].as<const char*>());
+    TEST_ASSERT_EQUAL_STRING("unchanged", doc["results"]["sample_int"].as<const char*>());
+    TEST_ASSERT_EQUAL_STRING("config_applied", doc["event"].as<const char*>());
+}
+
 // --- Unity runner ------------------------------------------------------------
 
 int main() {
@@ -176,5 +248,9 @@ int main() {
     RUN_TEST(test_preValidate_allows_disabling_both_temp);
     RUN_TEST(test_preValidate_allows_swap_via_two_keys);
     RUN_TEST(test_preValidate_rejects_one_key_against_existing);
+    RUN_TEST(test_ack_rich_format_serializes);
+    RUN_TEST(test_ack_rich_format_includes_ts_rfc3339);
+    RUN_TEST(test_ack_rich_format_zero_epoch_emits_sentinel);
+    RUN_TEST(test_unchanged_category_serializes_in_rich_ack);
     return UNITY_END();
 }
