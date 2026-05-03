@@ -168,7 +168,27 @@ AckSummary applyConfigToNvs(const ConfigParser::ConfigUpdate& u) {
     }
 
     prefs.end();
-    return s;}
+    return s;
+}
+
+/// Pre-validation hook: called before the apply loop so PR-2 can enforce
+/// cross-key constraints (e.g. feat_ds18b20 ⊕ feat_sht31 mutual exclusion).
+///
+/// PR-1: no rules — always returns true.  outEntries and outCount are
+/// untouched; PR-2 will fill them with conflict AckEntry values.
+///
+/// Returns true when the parsed config may proceed to applyConfigToNvs.
+bool preValidate(const ConfigParser::ConfigUpdate& /*parsed*/,
+                 AckEntry* /*outEntries*/, size_t* outCount) {
+    if (outCount) *outCount = 0;
+    return true;
+}
+
+/// Handle a /config/get request — returns current NVS state as JSON.
+/// PR-1 stub: logs and returns without publishing.  PR-2 will implement.
+void handleConfigGet(const char* /*topic*/) {
+    Serial.println("[CONFIG] /config/get not implemented in PR-1");
+}
 
 /// Build the ack message JSON. Reads current NVS to populate current_state
 /// (post-apply view).
@@ -200,15 +220,23 @@ size_t buildAckJson(const AckSummary& applied,
 }
 
 /// Callback invoked by MqttClient::loop() when a message arrives on a
-/// subscribed topic. We only subscribe to one topic per session — the
-/// per-device config topic — so no topic dispatch is needed.
+/// subscribed topic.  Routes to the appropriate handler by topic suffix.
 void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) {
-    // Route scale/cmd and scale/config messages before config handling.
-    if (strncmp(topic, "combsense/hive/", 15) == 0 && strstr(topic, "/scale/")) {
+    // Topic dispatch — evaluated in specificity order.
+    if (strstr(topic, "/scale/cmd") || strstr(topic, "/scale/config")) {
         Scale::onMessage(topic, reinterpret_cast<const char*>(payload), len);
         return;
     }
+    if (strstr(topic, "/config/get")) {
+        handleConfigGet(topic);
+        return;
+    }
+    if (!strstr(topic, "/config")) {
+        Serial.printf("[CONFIG] unroutable topic=%s — ignoring\n", topic);
+        return;
+    }
 
+    // /config apply path.
     Serial.printf("[CONFIG] received %u bytes on %s\n",
                   static_cast<unsigned>(len), topic);
 
@@ -224,6 +252,14 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
     ConfigParser::ConfigUpdate parsed;
     if (!ConfigParser::parse(body, parsed)) {
         Serial.println("[CONFIG] parse failed");
+        return;
+    }
+
+    // Pre-validate: PR-2 will enforce cross-key constraints here.
+    AckEntry preValidEntries[ConfigParser::MAX_REJECTED_KEYS];
+    size_t   preValidCount = 0;
+    if (!preValidate(parsed, preValidEntries, &preValidCount)) {
+        Serial.println("[CONFIG] preValidate rejected — aborting apply");
         return;
     }
 
