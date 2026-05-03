@@ -11,6 +11,7 @@
 #include <HX711.h>
 #include <Preferences.h>
 #include <ArduinoJson.h>
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <time.h>
@@ -162,6 +163,64 @@ void cmdVerify(double expected_kg) {
     char buf[200];
     serializeVerifyResultEvent(measured, expected_kg, err, nowEpoch(), buf, sizeof(buf));
     publishStatusEvent(buf);
+}
+
+void cmdStreamRaw(int32_t duration_sec) {
+    streaming_ = true;
+    int64_t cap = std::min<int32_t>(duration_sec, 120);  // hard cap per spec
+    stream_until_ = nowEpoch() + cap;
+    last_stream_ms_ = millis();
+}
+
+void cmdStopStream() {
+    streaming_ = false;
+}
+
+void cmdModifyStart(const char* label) {
+    int32_t raw;
+    double kg;
+    Scale::sample(raw, kg);  // best-effort; OK if HX711 is flaky here
+    modify_pre_kg_ = std::isfinite(kg) ? kg : 0.0;
+    std::strncpy(modify_label_, label, sizeof(modify_label_) - 1);
+    modify_label_[sizeof(modify_label_) - 1] = '\0';
+    modify_started_at_ = nowEpoch();
+    modify_timeout_at_ = modify_started_at_ + MODIFY_DEFAULT_TIMEOUT_SEC;
+    modify_active_ = true;
+
+    char buf[200];
+    serializeModifyStartedEvent(modify_label_, modify_pre_kg_, nowEpoch(), buf, sizeof(buf));
+    publishStatusEvent(buf);
+}
+
+void cmdModifyEnd(const char* label) {
+    if (!modify_active_) return;
+    if (strcmp(modify_label_, label) != 0) {
+        char buf[200];
+        serializeErrorEvent("modify_label_mismatch", label, nowEpoch(), buf, sizeof(buf));
+        publishStatusEvent(buf);
+        return;
+    }
+    int32_t raw;
+    double kg;
+    Scale::sample(raw, kg);
+    double post_kg = std::isfinite(kg) ? kg : 0.0;
+    double delta = post_kg - modify_pre_kg_;
+    int32_t duration = static_cast<int32_t>(nowEpoch() - modify_started_at_);
+
+    char buf[256];
+    if (std::fabs(delta) < MODIFY_DELTA_THRESHOLD_KG) {
+        serializeModifyWarningEvent(modify_label_, delta, "no_significant_change_detected",
+                                    nowEpoch(), buf, sizeof(buf));
+    } else {
+        serializeModifyCompleteEvent(modify_label_, modify_pre_kg_, post_kg, delta,
+                                     duration, false, nowEpoch(), buf, sizeof(buf));
+    }
+    publishStatusEvent(buf);
+    modify_active_ = false;
+}
+
+void cmdModifyCancel() {
+    modify_active_ = false;
 }
 
 }  // anonymous namespace
