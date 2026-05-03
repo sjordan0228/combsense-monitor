@@ -236,10 +236,23 @@ void handleConfigMessage(const char* topic, const uint8_t* payload, size_t len) 
         return;
     }
 
-    // Pre-validate: PR-2 will enforce cross-key constraints here.
+    // Pre-validate: enforce cross-key constraints (feat_ds18b20 ⊕ feat_sht31).
+    // Read current NVS state for the two mutually-exclusive temp-sensor flags
+    // so preValidate can compute the post-apply state without doing I/O itself.
+    TemperatureNvsState tempNvsState;
+    {
+        Preferences prefs;
+        prefs.begin(NVS_NAMESPACE, true);
+        tempNvsState.ds18b20_enabled =
+            (prefs.getUChar("feat_ds18b20", DEFAULT_FEAT_DS18B20) != 0);
+        tempNvsState.sht31_enabled =
+            (prefs.getUChar("feat_sht31", DEFAULT_FEAT_SHT31) != 0);
+        prefs.end();
+    }
+
     AckEntry preValidEntries[ConfigParser::MAX_REJECTED_KEYS];
     size_t   preValidCount = 0;
-    if (!preValidate(parsed, preValidEntries, &preValidCount)) {
+    if (!preValidate(parsed, tempNvsState, preValidEntries, &preValidCount)) {
         Serial.println("[CONFIG] preValidate rejected — aborting apply");
         return;
     }
