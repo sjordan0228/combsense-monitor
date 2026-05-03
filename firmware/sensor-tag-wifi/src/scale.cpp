@@ -223,6 +223,36 @@ void cmdModifyCancel() {
     modify_active_ = false;
 }
 
+void publishHeartbeat() {
+    char buf[160];
+    serializeAwakeEvent(keep_alive_until_, nowEpoch(), buf, sizeof(buf));
+    publishStatusEvent(buf);
+    last_heartbeat_ms_ = millis();
+}
+
+void enterExtendedAwake(int64_t kau) {
+    extended_awake_    = true;
+    keep_alive_until_  = kau;
+    last_heartbeat_ms_ = 0;  // force immediate heartbeat
+    publishHeartbeat();
+}
+
+void exitExtendedAwake() {
+    extended_awake_   = false;
+    keep_alive_until_ = 0;
+    streaming_        = false;
+    modify_active_    = false;
+}
+
+void publishStreamSample() {
+    int32_t raw;
+    double kg;
+    if (!Scale::sample(raw, kg)) return;
+    char buf[200];
+    serializeRawStreamEvent(raw, kg, stable_.isStable(), nowEpoch(), buf, sizeof(buf));
+    publishStatusEvent(buf);
+}
+
 }  // anonymous namespace
 
 namespace Scale {
@@ -260,7 +290,39 @@ void onMessage(const char* /*topic*/, const char* /*payload*/, unsigned int /*le
 
 void onConnect() {}
 
-void tick() {}
+void tick() {
+    if (!extended_awake_) return;
+    int64_t now = nowEpoch();
+
+    // Exit if keep-alive expired (modulo skew)
+    if (!isKeepAliveValid(keep_alive_until_, now)) {
+        exitExtendedAwake();
+        return;
+    }
+
+    // Heartbeat every 60s
+    if ((millis() - last_heartbeat_ms_) >= HEARTBEAT_INTERVAL_MS) {
+        publishHeartbeat();
+    }
+
+    // Stream sampling at 1Hz
+    if (streaming_) {
+        if (now >= stream_until_) {
+            streaming_ = false;
+        } else if ((millis() - last_stream_ms_) >= HX711_STREAM_INTERVAL_MS) {
+            publishStreamSample();
+            last_stream_ms_ = millis();
+        }
+    }
+
+    // Modify timeout
+    if (modify_active_ && now >= modify_timeout_at_) {
+        char buf[160];
+        serializeModifyTimeoutEvent(modify_label_, now, buf, sizeof(buf));
+        publishStatusEvent(buf);
+        modify_active_ = false;
+    }
+}
 
 bool ntpSynced() {
     // Heuristic: if epoch is well past 2020, NTP has fired.
